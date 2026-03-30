@@ -4,6 +4,9 @@ import PackageDescription
 
 let package = Package(
     name: "saturn",
+    platforms: [
+        .macOS(.v10_15)
+    ],
     products: [
         .library(name: "saturn-lib", targets: ["saturn-lib"]),
         .executable(name: "saturn", targets: ["saturn"])
@@ -22,6 +25,9 @@ let package = Package(
             ]
         ),
         
-        .testTarget(name: "saturn-tests", dependencies: ["saturn-lib"]),
+        .testTarget(
+            name: "saturn-tests",
+            dependencies: ["saturn-lib"]
+        ),
     ]
 )
