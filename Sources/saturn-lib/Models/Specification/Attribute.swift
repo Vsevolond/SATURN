@@ -37,7 +37,7 @@ public struct Attribute {
     public init(
         property: Property,
         target: String,
-        type: Kind
+        type: Kind = .synthesized
     ) {
         self.property = property
         self.target = target

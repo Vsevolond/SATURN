@@ -10,11 +10,14 @@ public indirect enum Production {
     
     // MARK: - Cases
     
-    /// A terminal `Term` or nonterminal `Nonterm` symbol
-    case symbol(any Symbol)
+    /// A terminal `Term` symbol
+    case term(Term)
     
-    /// Zero or more repetition: `%rep ( ... )`
-    case `repeat`(productions: [Production])
+    /// A nonterminal `Nonterm` symbol
+    case nonterm(Nonterm)
+    
+    /// One/zero or more repetition: `%rep ( ... )`, `%rep [ ... ]`
+    case `repeat`(productions: [Production], optional: Bool)
     
     /// Optional group: `[ ... ]`
     case optional(productions: [Production])

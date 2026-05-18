@@ -23,7 +23,7 @@ public struct Specification {
     public var methods: [String : Method]
     
     /// The start nonterminal of the grammar
-    public var axiome: Nonterm
+    public var axiom: Nonterm
     
     // MARK: - Initializers
     
@@ -32,12 +32,12 @@ public struct Specification {
         types: Set<String> = [],
         attributes: [String : [Attribute]] = [:],
         methods: [String : Method] = [:],
-        axiome: Nonterm
+        axiom: Nonterm
     ) {
         self.tokens = tokens
         self.types = types
         self.attributes = attributes
         self.methods = methods
-        self.axiome = axiome
+        self.axiom = axiom
     }
 }

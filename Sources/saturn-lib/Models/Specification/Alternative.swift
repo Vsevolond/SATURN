@@ -13,16 +13,16 @@ public struct Alternative {
     /// The sequence of grammar elements on the right side of the rule
     public let elements: [Production]
     
-    /// Optional semantic action
-    public let action: Action?
+    /// The sequence of semantic actions
+    public let actions: [Statement]
     
     // MARK: - Initializers
     
     public init(
         elements: [Production] = [],
-        action: Action? = nil
+        actions: [Statement] = []
     ) {
         self.elements = elements
-        self.action = action
+        self.actions = actions
     }
 }
