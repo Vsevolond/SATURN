@@ -5,24 +5,24 @@
 //  Created by Vsevolod Donchenko on 26.03.2026.
 //
 
-/// A complete grammar specification parsed from a `.spec` source file
+/// Полная спецификация грамматики, разобранная из файла `.spec`
 public struct Specification {
     
     // MARK: - Public Properties
     
-    /// All declared tokens in `%tokens` keyed by token name
+    /// Все токены секции `%tokens` по имени токена
     public var tokens: [String : Token]
     
-    /// User-defined type names declared in `%types`
+    /// Имена пользовательских типов из секции `%types`
     public var types: Set<String>
     
-    /// Attribute definitions in `%attributes` grouped by symbol name
+    /// Атрибуты секции `%attributes`, сгруппированные по имени символа
     public var attributes: [String : [Attribute]]
     
-    /// All declared methods in `%methods` keyed by mehod name
+    /// Все методы секции `%methods` по имени метода
     public var methods: [String : Method]
     
-    /// The start nonterminal of the grammar
+    /// Аксиома — начальный нетерминал грамматики
     public var axiom: Nonterm
     
     // MARK: - Initializers

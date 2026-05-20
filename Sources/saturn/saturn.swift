@@ -8,6 +8,8 @@
 import Foundation
 import ArgumentParser
 
+import saturn_core
+
 @main
 struct SaturnCLI: ParsableCommand {
     
@@ -32,5 +34,10 @@ struct SaturnCLI: ParsableCommand {
         } else {
             print("semantics not exist")
         }
+        
+        let string = try String(contentsOf: configUrl, encoding: .utf8)
+        let spec = try Specification.parse(string)
+        
+        dump(spec)
     }
 }

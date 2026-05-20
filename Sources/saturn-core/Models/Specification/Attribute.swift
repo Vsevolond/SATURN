@@ -5,7 +5,7 @@
 //  Created by Vsevolod Donchenko on 26.03.2026.
 //
 
-/// A typed attribute declaration bound to a grammar symbol
+/// Типизированное объявление атрибута, привязанного к символу грамматики
 public struct Attribute {
     
     // MARK: - Type Entities
@@ -14,22 +14,22 @@ public struct Attribute {
         
         // MARK: - Cases
         
-        /// Attribute is computed from children
+        /// Атрибут вычисляется по дочерним символам
         case synthesized
         
-        /// Attribute is passed down from parent
+        /// Атрибут передаётся от родительского символа
         case inherited
     }
     
     // MARK: - Public Properties
     
-    /// The property (name + type) this attribute describes
+    /// Свойство (имя + тип), которое описывает атрибут
     public let property: Property
     
-    /// Name of the symbol this attribute belongs to
+    /// Имя символа, которому принадлежит атрибут
     public let target: String
     
-    /// The type of the attribute
+    /// Вид атрибута
     public let type: Kind
     
     // MARK: - Initializers

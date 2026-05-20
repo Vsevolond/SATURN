@@ -5,19 +5,19 @@
 //  Created by Vsevolod Donchenko on 30.03.2026.
 //
 
-/// A reference to a symbol attribute inside a semantic action
-public struct Reference {
+/// Ссылка на атрибут символа внутри семантического действия
+public struct Reference: Equatable {
     
     // MARK: - Public Properties
     
-    /// Symbol position in the rule (`$0`, `$1`, ...)
+    /// Позиция символа в правиле (`$0`, `$1`, ...)
     public let target: Int
     
-    /// Attribute name referenced to
+    /// Имя атрибута, на который ссылаются
     public let attribute: String
     
-    /// Index chain when the attribute is an array: `.<attribute>[i][j]...`
-    /// Empty for non-array attributes
+    /// Цепочка индексов для атрибута-массива: `.<attribute>[i][j]...`
+    /// Пустая для атрибутов, не являющихся массивами
     public let subscripts: [Expression]
     
     // MARK: - Initializers

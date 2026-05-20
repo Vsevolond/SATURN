@@ -8,26 +8,28 @@ let package = Package(
         .macOS(.v10_15)
     ],
     products: [
-        .library(name: "saturn-lib", targets: ["saturn-lib"]),
+        .library(name: "saturn-core", targets: ["saturn-core"]),
         .executable(name: "saturn", targets: ["saturn"])
     ],
     dependencies: [
-        .package(url: "https://github.com/apple/swift-argument-parser", from: "1.3.0")
+        .package(url: "https://github.com/apple/swift-argument-parser", from: "1.3.0"),
+        .package(url: "https://github.com/pointfreeco/swift-parsing", from: "0.13.0")
     ],
     targets: [
-        .target(name: "saturn-lib"),
+        .target(name: "saturn-core"),
         
         .executableTarget(
             name: "saturn",
             dependencies: [
-                "saturn-lib",
-                .product(name: "ArgumentParser", package: "swift-argument-parser")
+                "saturn-core",
+                .product(name: "ArgumentParser", package: "swift-argument-parser"),
+                .product(name: "Parsing", package: "swift-parsing")
             ]
         ),
         
         .testTarget(
             name: "saturn-tests",
-            dependencies: ["saturn-lib"]
+            dependencies: ["saturn-core"]
         ),
     ]
 )

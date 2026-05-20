@@ -5,18 +5,18 @@
 //  Created by Vsevolod Donchenko on 26.03.2026.
 //
 
-/// A method declaration available for use in semantic actions
+/// Объявление метода, доступного для вызова из семантических действий
 public struct Method {
     
     // MARK: - Public Properties
     
-    /// Name of the method as it appears in semantic actions
+    /// Имя метода в том виде, как он записывается в семантических действиях
     public let name: String
     
-    /// Return type of the method, `nil` for `void`
+    /// Тип возвращаемого значения, `nil` соответствует `void`
     public let returnType: Property.Kind?
     
-    /// Ordered list of parameter types
+    /// Упорядоченный список типов параметров
     public let arguments: [Property.Kind]
     
     // MARK: - Initializers

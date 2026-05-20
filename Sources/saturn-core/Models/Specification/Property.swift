@@ -5,7 +5,7 @@
 //  Created by Vsevolod Donchenko on 26.03.2026.
 //
 
-/// A named, typed field of a grammar symbol attribute
+/// Именованное типизированное поле атрибута символа грамматики
 public struct Property {
     
     // MARK: - Type Entities
@@ -14,31 +14,31 @@ public struct Property {
         
         // MARK: - Cases
         
-        /// Built-in integer type
+        /// Встроенный целочисленный тип
         case int
         
-        /// Built-in floating-point type
+        /// Встроенный вещественный тип
         case float
         
-        /// Built-in boolean type
+        /// Встроенный булевый тип
         case bool
         
-        /// Built-in string type
+        /// Встроенный строковый тип
         case string
         
-        /// A user-defined type declared in `%types`
+        /// Пользовательский тип, объявленный в `%types`
         case custom(String)
         
-        /// An array of another kind
+        /// Массив другого типа
         case array(Kind)
     }
     
     // MARK: - Public Properties
     
-    /// Attribute name as declared
+    /// Имя атрибута в том виде, как оно объявлено
     public let name: String
     
-    /// The type of this property
+    /// Тип свойства
     public let type: Kind
     
     // MARK: - Initializers
