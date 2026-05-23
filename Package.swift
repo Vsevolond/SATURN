@@ -29,7 +29,7 @@ let package = Package(
         
         .testTarget(
             name: "saturn-tests",
-            dependencies: ["saturn-core"]
+            dependencies: ["saturn", "saturn-core"]
         ),
     ]
 )

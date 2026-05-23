@@ -63,15 +63,16 @@ extension Specification {
                 result.append(symbol)
                 
             case let .repeat(nested, optional):
-                /// repeat(...) -> array, repeat[...] -> array + optional
-                var wrappers = wrappers + [.array]
-                if optional { wrappers += [.optional] }
+                /// repeat(...) -> array, repeat[...] -> optional + array
+                var inner: [Wrapper] = [.array]
+                if optional { inner = inner + [.optional] }
                 
-                result += flatten(nested, wrappers: wrappers)
+                result += flatten(nested, wrappers: inner + wrappers)
                 
             case .optional(let nested):
-                let wrappers = wrappers + [.optional]
-                result += flatten(nested, wrappers: wrappers)
+                /// optional — внешняя относительно nested,
+                /// но внутренняя относительно уже накопленных wrappers
+                result += flatten(nested, wrappers: [.optional] + wrappers)
             }
         }
         

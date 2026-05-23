@@ -10,7 +10,7 @@ import Foundation
 extension Specification {
     
     /// Ошибка семантического анализа спецификации
-    public enum SemanticError: Error {
+    public enum SemanticError: Error, Equatable {
         
         // MARK: - Token errors
         
