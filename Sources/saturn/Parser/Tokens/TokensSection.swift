@@ -14,7 +14,7 @@ struct TokensSection: Parser {
     
     // MARK: - Internal Properties
     
-    var body: some Parser<Substring, [String: Token]> {
+    var body: some Parser<Substring, [Token]> {
         Parse {
             /// Заголовок секции
             "%tokens"
@@ -24,10 +24,6 @@ struct TokensSection: Parser {
             
             /// Последовательность объявлений токенов, разделённых пробелами и комментариями
             Many(1...) { TokenDefinition() } separator: { Skipper(comments: true) }
-        }
-        .map { definitions in
-            /// Собираем пары `(имя, токен)` в словарь
-            Dictionary(definitions) { _, last in last }
         }
     }
 }

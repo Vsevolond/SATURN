@@ -11,7 +11,7 @@ public struct Reference: Equatable {
     // MARK: - Public Properties
     
     /// Позиция символа в правиле (`$0`, `$1`, ...)
-    public let target: Int
+    public let target: UInt
     
     /// Имя атрибута, на который ссылаются
     public let attribute: String
@@ -23,7 +23,7 @@ public struct Reference: Equatable {
     // MARK: - Initializers
     
     public init(
-        target: Int,
+        target: UInt,
         attribute: String,
         subscripts: [Expression] = []
     ) {

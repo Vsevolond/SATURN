@@ -11,7 +11,7 @@ public struct Specification {
     // MARK: - Public Properties
     
     /// Все токены секции `%tokens` по имени токена
-    public var tokens: [String : Token]
+    public var tokens: [Token]
     
     /// Имена пользовательских типов из секции `%types`
     public var types: Set<String>
@@ -28,7 +28,7 @@ public struct Specification {
     // MARK: - Initializers
     
     public init(
-        tokens: [String : Token] = [:],
+        tokens: [Token] = [],
         types: Set<String> = [],
         attributes: [String : [Attribute]] = [:],
         methods: [String : Method] = [:],

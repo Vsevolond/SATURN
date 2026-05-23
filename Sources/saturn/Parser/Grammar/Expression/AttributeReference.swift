@@ -20,7 +20,7 @@ struct AttributeReference: Parser {
             "$"
             
             /// Номер позиции символа в правиле
-            Int.parser()
+            UInt.parser()
             
             /// Точка-разделитель позиции и имени атрибута
             "."

@@ -27,12 +27,28 @@ struct AttributeType: Parser {
                 TypeIdent().map { Property.Kind.custom($0) }
             }
             
-            /// Хвост — произвольное число пар `[]`
-            Many { "[]" }
+            /// Опционал базового типа
+            Optionally { "?" }
+            
+            /// Хвост — произвольное число пар `[]`, у каждой свой опциональный `?`
+            Many {
+                Parse {
+                    "[]"
+                    Optionally { "?" }
+                }
+            }
         }
-        .map { base, dimensions in
-            /// Заворачиваем базовый тип в `.array` столько раз, сколько было `[]`
-            dimensions.reduce(base) { type, _ in Property.Kind.array(type) }
+        .map { base, optional, dimensions in
+            /// Базовый тип, при необходимости обёрнутый в опционал
+            let base = optional == nil ? base : .optional(base)
+            
+            /// Каждая пара `[]` оборачивает текущий тип в массив,
+            /// затем — в опционал, если за этой парой стоял `?`
+            return dimensions.reduce(base) { type, dimension in
+                let array = Property.Kind.array(type)
+                
+                return dimension == nil ? array : .optional(array)
+            }
         }
     }
 }

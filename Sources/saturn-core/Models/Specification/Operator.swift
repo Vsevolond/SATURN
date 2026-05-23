@@ -6,19 +6,19 @@
 //
 
 /// Бинарный арифметический оператор, используемый в выражениях
-public enum Operator: Equatable {
+public enum Operator: String, Equatable {
     
     // MARK: - Cases
     
     /// Сложение: `+`
-    case add
+    case add = "+"
     
     /// Вычитание: `-`
-    case sub
+    case sub = "-"
     
     /// Умножение: `*`
-    case mul
+    case mul = "*"
     
     /// Деление: `/`
-    case div
+    case div = "/"
 }

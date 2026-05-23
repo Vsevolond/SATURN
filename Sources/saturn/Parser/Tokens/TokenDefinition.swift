@@ -16,7 +16,7 @@ struct TokenDefinition: Parser {
     
     // MARK: - Internal Methods
     
-    func parse(_ input: inout Substring) throws -> (String, Token) {
+    func parse(_ input: inout Substring) throws -> Token {
         /// Имя токена в виде идентификатора `[A-Z][A-Z0-9_]*`
         let name = try TokenIdent().parse(&input)
         
@@ -32,7 +32,7 @@ struct TokenDefinition: Parser {
         /// Значение токена: строковый литерал или регулярное выражение
         let value = try value(&input)
         
-        return (name, Token(name: name, value: value))
+        return Token(name: name, value: value)
     }
     
     // MARK: - Private Methods

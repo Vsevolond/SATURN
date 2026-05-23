@@ -38,3 +38,23 @@ public struct Token {
         self.value = value
     }
 }
+
+// MARK: - Extensions
+
+extension Token.Value: Equatable {
+    
+    // MARK: - Type Methods
+    
+    public static func == (lhs: Token.Value, rhs: Token.Value) -> Bool {
+        switch (lhs, rhs) {
+        case let (.literal(l), .literal(r)):
+            return l == r
+            
+        case let (.regex(l), .regex(r)):
+            return l.pattern == r.pattern
+            
+        default:
+            return false
+        }
+    }
+}
