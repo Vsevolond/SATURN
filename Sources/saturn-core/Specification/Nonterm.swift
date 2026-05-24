@@ -27,8 +27,9 @@ public final class Nonterm: Equatable {
     
     // MARK: - Type Methods
     
+    /// Нетерминалы сравниваются по имени
     public static func == (lhs: Nonterm, rhs: Nonterm) -> Bool {
-        lhs.name == rhs.name && lhs.disclosures == rhs.disclosures
+        lhs.name == rhs.name
     }
 }
 
