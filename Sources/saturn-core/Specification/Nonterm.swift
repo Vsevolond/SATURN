@@ -16,10 +16,10 @@ public final class Nonterm: Equatable {
     /// Все альтернативы вывода нетерминала в порядке объявления
     public var disclosures: [Alternative] { _disclosures }
     
-    // MARK: - Internal Properties
+    // MARK: - Private Properties
     
     /// Все альтернативы вывода нетерминала в порядке объявления (изменяемое)
-    private(set) var _disclosures: [Alternative] = []
+    private var _disclosures: [Alternative] = []
     
     // MARK: - Initializers
     
