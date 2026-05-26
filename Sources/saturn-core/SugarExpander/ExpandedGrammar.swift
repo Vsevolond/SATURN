@@ -25,7 +25,7 @@ public struct ExpandedGrammar {
     
     // MARK: - Initializers
     
-    init(axiom: Nonterm, nonterms: [Nonterm]) {
+    public init(axiom: Nonterm, nonterms: [Nonterm]) {
         self.axiom = axiom
         self.nonterms = nonterms
         

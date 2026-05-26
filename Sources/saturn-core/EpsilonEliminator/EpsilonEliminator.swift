@@ -162,7 +162,7 @@ public struct EpsilonEliminator {
                 .map { try rebind($0.element, eliminated: eliminated) }
             
             /// Форма варианта — вся последовательность ключей символов целиком
-            let shape = try remaining.map(symbolKey)
+            let shape = try remaining.map { try $0.symbolKey }
             
             guard !seen.contains(shape) else { continue }
             seen.insert(shape)
@@ -190,20 +190,6 @@ public struct EpsilonEliminator {
         }
     }
     
-    /// Имя символа для сравнения форм
-    private func symbolKey(_ production: Production) throws(EpsilonEliminateError) -> String {
-        switch production {
-        case .term(let name):
-            return name
-            
-        case .nonterm(let nonterm):
-            return nonterm.name
-            
-        case .repeat, .optional:
-            throw .sugarNotExpanded
-        }
-    }
-    
     /// Свободное имя для новой аксиомы, не совпадающее с существующими
     private func startName(taken nonterms: Set<String>) -> String {
         var name = "_Start"
@@ -215,5 +201,28 @@ public struct EpsilonEliminator {
         }
         
         return name
+    }
+}
+
+// MARK: - Private Extensions
+
+private extension Production {
+    
+    // MARK: - Internal Properties
+    
+    /// Имя символа для сравнения форм
+    var symbolKey: String {
+        get throws(EpsilonEliminateError) {
+            switch self {
+            case .term(let name):
+                return name
+                
+            case .nonterm(let nonterm):
+                return nonterm.name
+                
+            case .repeat, .optional:
+                throw .sugarNotExpanded
+            }
+        }
     }
 }

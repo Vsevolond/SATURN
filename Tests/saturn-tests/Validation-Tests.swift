@@ -1,8 +1,8 @@
 //
-//  Semantic-Tests.swift
+//  Validation-Tests.swift
 //  saturn
 //
-//  Created by Vsevolod Donchenko on 23.05.2026.
+//  Created by Vsevolod Donchenko on 25.05.2026.
 //
 
 import Testing
@@ -12,7 +12,7 @@ import Testing
 
 // MARK: - Test Methods
 
-struct SemanticTests {
+struct ValidationTests {
     
     // MARK: - Tests
     
