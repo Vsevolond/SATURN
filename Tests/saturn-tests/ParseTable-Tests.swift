@@ -7,7 +7,7 @@
 
 import Testing
 
-import saturn_core
+@testable import saturn_core
 
 struct ParseTableTests {
     

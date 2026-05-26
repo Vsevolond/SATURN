@@ -9,7 +9,7 @@ import Foundation
 
 /// Распознанная единица входного текста
 /// Конкретное вхождение токена в текст: имя сработавшего правила, поглощенная подстрока и позиция её начала
-public struct Lexeme: Equatable {
+public struct Lexeme: Equatable, Sendable {
     
     // MARK: - Public Properties
     
