@@ -19,6 +19,10 @@ public typealias ExpansionMap = [String: SugarSite]
 /// На выходе грамматика может содержать ε-правила
 public struct SugarExpander {
     
+    // MARK: - Initializers
+    
+    public init() {}
+    
     // MARK: - Public Methods
     
     /// Разворачивает сахар грамматики, достижимой от аксиомы

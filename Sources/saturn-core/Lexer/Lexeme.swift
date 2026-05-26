@@ -21,4 +21,12 @@ public struct Lexeme: Equatable, Sendable {
     
     /// Позиция первой кодовой  точки лексемы во входном тексте
     public let position: Position
+    
+    // MARK: - Initializers
+    
+    public init(name: String, text: String, position: Position) {
+        self.name = name
+        self.text = text
+        self.position = position
+    }
 }

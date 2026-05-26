@@ -66,7 +66,8 @@ public struct NumberedGrammar {
                 let production = NumberedProduction(
                     id: productions.count,
                     lhs: nonterm.name,
-                    rhs: rhs
+                    rhs: rhs,
+                    dropped: alternative.dropped
                 )
                 
                 productions.append(production)

@@ -25,4 +25,12 @@ public struct Position: Equatable, Sendable {
     
     /// Начало входного текста
     static let start = Position(line: 1, column: 1, offset: 0)
+    
+    // MARK: - Initializers
+    
+    public init(line: Int, column: Int, offset: Int) {
+        self.line = line
+        self.column = column
+        self.offset = offset
+    }
 }

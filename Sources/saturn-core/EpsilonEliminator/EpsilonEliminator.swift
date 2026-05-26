@@ -17,10 +17,14 @@ import Foundation
 ///    ввести свежую аксиому `S* → S | ε`, сохранив пустую цепочку флагом
 public struct EpsilonEliminator {
     
+    // MARK: - Initializers
+    
+    public init() {}
+    
     // MARK: - Public Methods
     
     /// Устраняет ε-правила грамматики
-    public func eliminate(_ grammar: ExpandedGrammar) throws -> EpsilonFreeGrammar {
+    public func eliminate(_ grammar: ExpandedGrammar, map: ExpansionMap = [:]) throws -> EpsilonFreeGrammar {
         let nullable = try nullableSet(grammar)
         
         /// Свежий нетерминал-двойник на каждый исходный
@@ -38,7 +42,8 @@ public struct EpsilonEliminator {
                 let variants = try expandNullable(
                     alternative,
                     nullable: nullable,
-                    eliminated: eliminated
+                    eliminated: eliminated,
+                    map: map
                 )
                 
                 for variant in variants {
@@ -135,7 +140,8 @@ public struct EpsilonEliminator {
     private func expandNullable(
         _ alternative: Alternative,
         nullable: Set<String>,
-        eliminated: [String: Nonterm]
+        eliminated: [String: Nonterm],
+        map: ExpansionMap
     ) throws -> [Alternative] {
         let elements = alternative.elements
         
@@ -167,7 +173,23 @@ public struct EpsilonEliminator {
             guard !seen.contains(shape) else { continue }
             seen.insert(shape)
             
-            results.append(Alternative(elements: remaining, actions: alternative.actions))
+            /// Метки выпавшего сахара: исходная позиция и имя — только для служебных нетерминалов развёртки
+            let droppedSugar = try dropped.sorted()
+                .compactMap { index -> Alternative.DroppedSugar? in
+                    let name = try elements[index].symbolKey
+                    
+                    guard map[name] != nil else { return nil }
+                    
+                    return Alternative.DroppedSugar(position: index, name: name)
+                }
+            
+            let alternative = Alternative(
+                elements: remaining,
+                actions: alternative.actions,
+                dropped: droppedSugar
+            )
+            
+            results.append(alternative)
         }
         
         return results
