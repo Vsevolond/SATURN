@@ -10,7 +10,7 @@ import Foundation
 /// Граф-структурированный стек
 ///
 /// Вершина — пара (LR-состояние, позиция входа)
-/// Ребро направлено к более раннему по разбору хвосту и несёт узел SPPF
+/// Ребро направлено к более раннему по разбору хвосту и несет узел SPPF
 public final class GSStack {
     
     // MARK: - Private Properties
@@ -18,7 +18,7 @@ public final class GSStack {
     /// Вершины по уровням: позиция → (состояние → вершина)
     private var levels: [Int: [Int: Vertex]] = [:]
     
-    /// Глобальный счётчик идентификаторов рёбер
+    /// Глобальный счетчик идентификаторов ребер
     private var counter: Int = 0
     
     // MARK: - Public Methods
@@ -35,7 +35,7 @@ public final class GSStack {
         return level[state]
     }
     
-    /// Возвращает вершину состояния на уровне, создавая её при отсутствии
+    /// Возвращает вершину состояния на уровне, создавая ее при отсутствии
     /// Возвращает `true`, если вершина создана, и `false`, если нет
     @discardableResult
     func obtainVertex(state: Int, position: Int) -> (vertex: Vertex, created: Bool) {
@@ -52,7 +52,7 @@ public final class GSStack {
     }
     
     /// Соединяет вершину с хвостом ребром, несущим узел SPPF
-    /// Выдаёт ребру стабильный идентификатор
+    /// Выдает ребру стабильный идентификатор
     /// Возвращает `true`, если ребро новое
     @discardableResult
     func connect(_ vertex: Vertex, to tail: Vertex, carrying node: SPPForest.Node) -> Bool {
@@ -74,10 +74,10 @@ extension GSStack {
     /// Ребро GSS: ссылка на вершину-хвост и узел SPPF, который лежит на стеке
     public struct Edge {
         
-        /// Вершина, к которой ведёт ребро (более ранний хвост стека)
+        /// Вершина, к которой ведет ребро (более ранний хвост стека)
         public let target: Vertex
         
-        /// Узел SPPF, помещённый на стек при переносе или свёртке
+        /// Узел SPPF, помещенный на стек при переносе или свертке
         public let node: SPPForest.Node
         
         /// Стабильный идентификатор ребра
@@ -97,10 +97,10 @@ extension GSStack {
         /// LR-состояние анализатора
         public let state: Int
         
-        /// Позиция входа, на которой живёт вершина (номер обработанной границы)
+        /// Позиция входа, на которой живет вершина (номер обработанной границы)
         public let position: Int
         
-        /// Исходящие рёбра к хвостам стека
+        /// Исходящие ребра к хвостам стека
         public private(set) var edges: [Edge]
         
         // MARK: - Initializers

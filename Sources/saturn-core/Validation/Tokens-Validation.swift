@@ -11,13 +11,13 @@ extension Specification {
     
     // MARK: - Private Methods
     
-    /// Токены: уникальность имён и значений.
+    /// Токены: уникальность имен и значений.
     func validateTokens() -> (tokens: Set<String>, errors: [SemanticError]) {
         var errors: [SemanticError] = []
         
         var names: Set<String> = []
         
-        /// Проверка уникальности имён
+        /// Проверка уникальности имен
         for token in tokens {
             if names.contains(token.name) {
                 let error = SemanticError.duplicateTokenName(token.name)

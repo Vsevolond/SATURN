@@ -192,7 +192,7 @@ extension Specification {
                 errors.append(error)
             }
             
-            /// Тип цели: объявленный, со снятием subscripts, БЕЗ оберток группировок
+            /// Тип цели: объявленный, со снятием subscripts, Бе оберток группировок
             let unfold = unfoldSubscripts(
                 reference,
                 baseType: attribute.property.type,

@@ -25,7 +25,7 @@ extension NumberedGrammar {
         /// Аксиому может сопровождать только конец входа
         follow[axiom] = [.end]
         
-        /// Повторяем проходы, пока хоть одно множество растёт
+        /// Повторяем проходы, пока хоть одно множество растет
         var changed = true
         
         while changed {
@@ -83,7 +83,7 @@ extension NumberedGrammar {
             var result: Set<GrammarSymbol> = []
             
             for production in productionsByLeft[name] ?? [] {
-                /// Грамматика ε-свободна — правая часть непуста, берём первый символ
+                /// Грамматика ε-свободна — правая часть непуста, берем первый символ
                 if let head = production.rhs.first {
                     let first = first(of: head, visited: &visited)
                     

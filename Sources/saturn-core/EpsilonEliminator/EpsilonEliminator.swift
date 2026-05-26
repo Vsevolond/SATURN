@@ -7,9 +7,9 @@
 
 import Foundation
 
-/// Устраняет ε-правила грамматики, переводя её в форму БНФ
+/// Устраняет ε-правила грамматики, переводя ее в форму БНФ
 ///
-/// Преобразование состоит из трёх шагов:
+/// Преобразование состоит из трех шагов:
 /// - Найти множество обнуляемых нетерминалов `Nullable` по неподвижной точке
 /// - Для каждой продукции построить все альтернативы, получаемые удалением
 ///    произвольного подмножества обнуляемых символов из правой части
@@ -42,7 +42,7 @@ public struct EpsilonEliminator {
                 )
                 
                 for variant in variants {
-                    /// Пустая правая часть (всё удалено) в грамматику не идёт
+                    /// Пустая правая часть (все удалено) в грамматику не идет
                     guard !variant.elements.isEmpty else { continue }
                     
                     target.add(variant)
@@ -66,12 +66,12 @@ public struct EpsilonEliminator {
         }
         
         /// Обнуляемую аксиому оборачиваем в свежую `S* → S`
-        /// Пустую цепочку несёт флаг `acceptsEmpty`
+        /// Пустую цепочку несет флаг `acceptsEmpty`
         let name = startName(taken: Set(eliminated.keys))
         let start = Nonterm(name: name)
         start.add(Alternative(elements: [.nonterm(axiom)]))
         
-        /// Новая аксиома идёт первой, сохраняя детерминированный порядок
+        /// Новая аксиома идет первой, сохраняя детерминированный порядок
         let extended = [start] + nonterms
         let grammar = ExpandedGrammar(axiom: start, nonterms: extended)
         
@@ -148,7 +148,7 @@ public struct EpsilonEliminator {
         /// Уже встреченные формы вариантов — для отсева совпавших целиком
         var seen: Set<[String]> = []
         
-        /// Каждая битовая маска задаёт своё подмножество удаляемых позиций
+        /// Каждая битовая маска задает свое подмножество удаляемых позиций
         for mask in 0..<(1 << count) {
             var dropped: Set<Int> = []
             

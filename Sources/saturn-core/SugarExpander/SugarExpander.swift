@@ -7,7 +7,7 @@
 
 import Foundation
 
-/// Карта развёртки: имя служебного нетерминала → его описание
+/// Карта развертки: имя служебного нетерминала → его описание
 public typealias ExpansionMap = [String: SugarSite]
 
 /// Разворачивает синтаксический сахар грамматики в рекурсивные правила
@@ -22,7 +22,7 @@ public struct SugarExpander {
     // MARK: - Public Methods
     
     /// Разворачивает сахар грамматики, достижимой от аксиомы
-    /// Результат развёртки: грамматика для парсера и карта для обратной свёртки
+    /// Результат развертки: грамматика для парсера и карта для обратной свертки
     public func expand(axiom: Nonterm) -> (grammar: ExpandedGrammar, map: ExpansionMap) {
         let counter = Counter()
         let context = Context(counter: counter)
@@ -46,7 +46,7 @@ private extension SugarExpander {
     
     // MARK: - Type Entities
     
-    /// Глобальный счётчик служебных нетерминалов
+    /// Глобальный счетчик служебных нетерминалов
     final class Counter {
         
         // MARK: - Private Properties
@@ -66,12 +66,12 @@ private extension SugarExpander {
     
     // MARK: - Type Entities
     
-    /// Изменяемое состояние одной развёртки
+    /// Изменяемое состояние одной развертки
     final class Context {
         
         // MARK: - Internal Properties
         
-        /// Счётчик имён служебных нетерминалов
+        /// Счетчик имен служебных нетерминалов
         let counter: Counter
         
         /// Пользовательские нетерминалы: имя → новый перевязанный объект
@@ -83,7 +83,7 @@ private extension SugarExpander {
         /// Служебные нетерминалы в порядке порождения
         var produced: [Nonterm] = []
         
-        /// Карта развёртки: имя служебного нетерминала → описание
+        /// Карта развертки: имя служебного нетерминала → описание
         var map: ExpansionMap = [:]
         
         // MARK: - Initializers

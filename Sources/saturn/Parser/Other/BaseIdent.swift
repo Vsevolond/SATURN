@@ -33,13 +33,13 @@ struct BaseIdent: Parser {
     
     var body: some Parser<Substring, String> {
         Parse {
-            /// Первый символ — обязательная латинская буква разрешённого регистра
+            /// Первый символ — обязательная латинская буква разрешенного регистра
             Prefix(1) { character in
                 guard character.isASCII, character.isLetter else { return false }
                 return form == .uppercase ? character.isUppercase : true
             }
             
-            /// Хвост — латинские буквы разрешённого регистра, цифры и подчёркивания
+            /// Хвост — латинские буквы разрешенного регистра, цифры и подчеркивания
             Prefix { character in
                 guard character.isASCII else { return false }
                 if character.isNumber || character == "_" { return true }
@@ -50,14 +50,14 @@ struct BaseIdent: Parser {
         }
         .map { head, tail in String(head) + String(tail) }
         .filter { name in
-            /// При форме с обязательной строчной — проверяем её наличие
+            /// При форме с обязательной строчной — проверяем ее наличие
             form == .mixedWithLowercase ? name.contains { $0.isLowercase } : true
         }
     }
     
     // MARK: - Internal Methods
     
-    /// Обёртка над `body`, при неуспехе предиката откатывает вход
+    /// Обертка над `body`, при неуспехе предиката откатывает вход
     func parse(_ input: inout Substring) throws -> String {
         let start = input
         

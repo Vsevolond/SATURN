@@ -61,7 +61,7 @@ struct AttributeDeclaration: Parser {
     /// Разбирает опциональное `(synthesized)` или `(inherited)`
     /// Возвращает `.synthesized` по умолчанию
     private func kind(_ input: inout Substring) throws -> Attribute.Kind {
-        /// Без открывающей скобки берём значение по умолчанию
+        /// Без открывающей скобки берем значение по умолчанию
         guard input.first == "(" else { return .synthesized }
         
         input.removeFirst()

@@ -645,7 +645,7 @@ struct ValidationTests {
         )
     }
 
-    /// `bool` запрещён в любой бинарной операции
+    /// `bool` запрещен в любой бинарной операции
     @Test func testBoolInBinary() {
         let spec = """
         %tokens
@@ -689,7 +689,7 @@ struct ValidationTests {
         )
     }
 
-    /// `argumentTypeMismatch`: метод ждёт `int`, передан опционал `int?`
+    /// `argumentTypeMismatch`: метод ждет `int`, передан опционал `int?`
     @Test func testArgumentTypeMismatchOptional() {
         let spec = """
         %tokens
@@ -714,7 +714,7 @@ struct ValidationTests {
         )
     }
 
-    /// `%rep ( )` даёт обёртку `array`: чтение `$1.v` под повторением — `array<int>`,
+    /// `%rep ( )` дает обертку `array`: чтение `$1.v` под повторением — `array<int>`,
     /// присваивание в `int`-цель некорректно
     @Test func testRepeatArrayMismatch() {
         let spec = """
@@ -761,7 +761,7 @@ struct ValidationTests {
         )
     }
 
-    /// `%rep [ ]` даёт `optional<array<...>>`: чтение под повторением-с-опционалом
+    /// `%rep [ ]` дает `optional<array<...>>`: чтение под повторением-с-опционалом
     @Test func testRepeatOptionalArray() {
         let spec = """
         %tokens
@@ -853,7 +853,7 @@ struct ValidationTests {
         )
     }
 
-    /// `string + string` — допустимо (единственная разрешённая операция над строками)
+    /// `string + string` — допустимо (единственная разрешенная операция над строками)
     @Test func testStringConcatenationValid() {
         let spec = """
         %tokens

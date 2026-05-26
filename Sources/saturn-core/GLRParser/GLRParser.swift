@@ -8,7 +8,7 @@
 import Foundation
 
 /// GLR-анализатор по схеме Алгоритма 1e Томиты
-/// Ведёт все ветви разбора одновременно поверх GSS и собирает результат в SPPF
+/// Ведет все ветви разбора одновременно поверх GSS и собирает результат в SPPF
 public final class GLRParser {
     
     // MARK: - Private Properties
@@ -63,7 +63,7 @@ public final class GLRParser {
         
         let count = lexemes.count
         
-        /// Идём по границам входа от 0 до count
+        /// Идем по границам входа от 0 до count
         for position in 0...count {
             /// Символ предпросмотра определяет, какие действия таблицы применимы на уровне
             let lookahead = symbol(at: position)
@@ -71,14 +71,14 @@ public final class GLRParser {
             /// Сначала исчерпываем все свертки уровня — они не двигают позицию
             reduceToFixpoint(at: position, lookahead: lookahead)
             
-            /// Затем переносим текущую лексему на следующий уровень, на конце входа её нет
+            /// Затем переносим текущую лексему на следующий уровень, на конце входа ее нет
             if position < count {
                 let lexeme = lexemes[position]
                 try shift(at: position, lexeme: lexeme)
             }
         }
         
-        /// Вход кончился — проверяем приём и фиксируем корень леса
+        /// Вход кончился — проверяем прием и фиксируем корень леса
         try acceptOrFail()
         
         return forest
@@ -96,31 +96,31 @@ public final class GLRParser {
         return .terminal(lexeme.name)
     }
     
-    /// Выполняет все применимые свёртки уровня до насыщения
+    /// Выполняет все применимые свертки уровня до насыщения
     private func reduceToFixpoint(at position: Int, lookahead: GrammarSymbol) {
-        /// Уже применённые пути, чтобы не свернуть один путь дважды за этот уровень
+        /// Уже примененные пути, чтобы не свернуть один путь дважды за этот уровень
         var processed: Set<ReductionKey> = []
         
-        /// Свёртка порождает новую вершину или ребро на том же уровне, а это открывает новые пути спуска
+        /// Свертка порождает новую вершину или ребро на том же уровне, а это открывает новые пути спуска
         /// Поэтому пересобираем пути в цикле, пока они появляются
         while true {
-            /// Собираем все ещё не обработанные пути свёрток с текущего уровня
+            /// Собираем все еще не обработанные пути сверток с текущего уровня
             let pending = collectReductions(at: position, lookahead: lookahead, skipping: processed)
             
             /// Новых путей нет — уровень насыщен
             guard !pending.isEmpty else { break }
             
             for reduction in pending {
-                /// Помечаем путь обработанным до применения — оно может добавить рёбра
+                /// Помечаем путь обработанным до применения — оно может добавить ребра
                 processed.insert(reduction.key)
                 
-                /// Строим узел SPPF и переход GOTO для этой свёртки
+                /// Строим узел SPPF и переход GOTO для этой свертки
                 apply(reduction, at: position)
             }
         }
     }
     
-    /// Собирает необработанные пути свёрток со всех вершин уровня
+    /// Собирает необработанные пути сверток со всех вершин уровня
     private func collectReductions(
         at position: Int,
         lookahead: GrammarSymbol,
@@ -130,20 +130,20 @@ public final class GLRParser {
         
         /// Перебираем все живые вершины уровня
         for vertex in stack.vertices(at: position) {
-            /// Для вершины — все её действия на символе предпросмотра
+            /// Для вершины — все ее действия на символе предпросмотра
             for action in table.actions(state: vertex.state, symbol: lookahead) {
-                /// Интересуют только свёртки, перенос и приём обрабатываются отдельно
+                /// Интересуют только свертки, перенос и прием обрабатываются отдельно
                 guard case .reduce(let production) = action else { continue }
                 
-                /// Длина правой части задаёт, на сколько рёбер спускаться по стеку назад
+                /// Длина правой части задает, на сколько ребер спускаться по стеку назад
                 let length = table.productions[production].rhs.count
                 
                 /// На развилках GSS таких путей несколько — каждый даст свою семью узла
                 for path in walkBack(from: vertex, steps: length) {
-                    /// Путь однозначно опознаётся первым ребром и продукцией
+                    /// Путь однозначно опознается первым ребром и продукцией
                     let key = ReductionKey(firstEdge: path.firstEdge, production: production)
                     
-                    /// Этот путь уже свёрнут на текущем уровне — пропускаем
+                    /// Этот путь уже свернут на текущем уровне — пропускаем
                     guard !processed.contains(key) else { continue }
                     
                     pending.append(
@@ -161,7 +161,7 @@ public final class GLRParser {
         return pending
     }
     
-    /// Применяет свёртку пути: строит узел SPPF и переход GOTO на том же уровне
+    /// Применяет свертку пути: строит узел SPPF и переход GOTO на том же уровне
     private func apply(_ reduction: PendingReduction, at position: Int) {
         let production = table.productions[reduction.production]
         
@@ -175,25 +175,25 @@ public final class GLRParser {
         }
         
         /// Узел нетерминала над диапазоном [хвост, позиция)
-        /// По ключу узел разделяется, поэтому разные пути одной свёртки попадут в один и тот же узел
+        /// По ключу узел разделяется, поэтому разные пути одной свертки попадут в один и тот же узел
         let node = forest.nonterminalNode(
             symbol: .nonterminal(production.lhs),
             start: reduction.tail.position,
             end: position
         )
         
-        /// Дети этого пути — ещё одна семья узла, повтор семьи отсекается внутри add
+        /// Дети этого пути — еще одна семья узла, повтор семьи отсекается внутри add
         let family = SPPForest.Family(production: production.id, children: reduction.children)
         node.add(family)
         
-        /// Вершина GOTO лежит на том же уровне — свёртка позицию не двигает
+        /// Вершина GOTO лежит на том же уровне — свертка позицию не двигает
         let target = stack.obtainVertex(state: next, position: position).vertex
         
-        /// Ребро от новой вершины к хвостовой несёт свёрнутый узел
+        /// Ребро от новой вершины к хвостовой несет свернутый узел
         stack.connect(target, to: reduction.tail, carrying: node)
     }
     
-    /// Все пути длины steps назад по GSS от вершины-истока свёртки
+    /// Все пути длины steps назад по GSS от вершины-истока свертки
     private func walkBack(
         from vertex: GSStack.Vertex,
         steps: Int
@@ -226,7 +226,7 @@ public final class GLRParser {
         
         var result: [(children: [SPPForest.Node], tail: GSStack.Vertex)] = []
         
-        /// На каждой развилке путь множится по числу рёбер
+        /// На каждой развилке путь множится по числу ребер
         for edge in vertex.edges {
             for subpath in tailPaths(from: edge.target, steps: steps - 1) {
                 /// Узел текущего ребра правее уже собранных, поэтому дописывается в конец
@@ -255,13 +255,13 @@ public final class GLRParser {
         
         for vertex in stack.vertices(at: position) {
             for action in table.actions(state: vertex.state, symbol: lookahead) {
-                /// Интересует только перенос, свёртки уже отработаны на этом уровне
+                /// Интересует только перенос, свертки уже отработаны на этом уровне
                 guard case .shift(let next) = action else { continue }
                 
-                /// Цель переноса живёт на следующем уровне, общее состояние сливает ветви
+                /// Цель переноса живет на следующем уровне, общее состояние сливает ветви
                 let target = stack.obtainVertex(state: next, position: position + 1).vertex
                 
-                /// Ребро к исходной вершине несёт общий терминальный узел
+                /// Ребро к исходной вершине несет общий терминальный узел
                 stack.connect(target, to: vertex, carrying: terminalNode)
                 shifted = true
             }
@@ -274,12 +274,12 @@ public final class GLRParser {
         }
     }
     
-    /// Проверяет приём на последнем уровне и привязывает корень леса
+    /// Проверяет прием на последнем уровне и привязывает корень леса
     private func acceptOrFail() throws(GLRParseError) {
         let last = lexemes.count
         
         for vertex in stack.vertices(at: last) {
-            /// Приём — действие accept вершины на маркере конца входа
+            /// Прием — действие accept вершины на маркере конца входа
             let accepts = table.actions(state: vertex.state, symbol: .end).contains(.accept)
             
             guard accepts else { continue }
@@ -291,7 +291,7 @@ public final class GLRParser {
         }
         
         let expected = expectedTerminals(at: last)
-        /// Ни одна вершина не приняла вход — разбор не дошёл до аксиомы
+        /// Ни одна вершина не приняла вход — разбор не дошел до аксиомы
         throw .unexpectedInput(lexeme: nil, expected: expected)
     }
     
@@ -300,7 +300,7 @@ public final class GLRParser {
         var expected: Set<String> = []
         
         for vertex in stack.vertices(at: position) {
-            /// Берём все символы, на которые у состояния вершины есть действие
+            /// Берем все символы, на которые у состояния вершины есть действие
             guard let cells = table.action[vertex.state] else { continue }
             
             for (symbol, _) in cells {
@@ -319,7 +319,7 @@ extension GLRParser {
     
     // MARK: - Type Entities
     
-    /// Отложенная свёртка по конкретному пути спуска
+    /// Отложенная свертка по конкретному пути спуска
     private struct PendingReduction {
         
         // MARK: - Intrenal Properties
@@ -335,8 +335,8 @@ extension GLRParser {
     
     // MARK: - Type Entities
     
-    /// Ключ свёртки: путь от истока однозначно задаётся первым ребром и продукцией
-    /// Дедупликация идёт по пути, а не по вершине
+    /// Ключ свертки: путь от истока однозначно задается первым ребром и продукцией
+    /// Дедупликация идет по пути, а не по вершине
     private struct ReductionKey: Hashable {
         
         // MARK: - Internal Properties

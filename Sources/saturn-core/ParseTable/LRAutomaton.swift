@@ -130,7 +130,7 @@ private extension NumberedGrammar {
         for item in items {
             let rhs = productions[item.production].rhs
             
-            /// Точка перед нужным символом — сдвигаем её на один
+            /// Точка перед нужным символом — сдвигаем ее на один
             if item.position < rhs.count, rhs[item.position] == symbol {
                 let item = LRItem(
                     production: item.production,
@@ -158,7 +158,7 @@ private extension NumberedGrammar {
             if item.position < rhs.count {
                 let symbol = rhs[item.position]
                 
-                /// Каждый символ берём один раз
+                /// Каждый символ берем один раз
                 if seen.insert(symbol).inserted { result.append(symbol) }
             }
         }

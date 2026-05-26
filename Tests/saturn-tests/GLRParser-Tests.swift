@@ -10,7 +10,7 @@ import Testing
 @testable import saturn_core
 
 /// Тесты GLR-разбора на эталонной неоднозначной грамматике E → E + E | n
-/// Грамматика даёт конфликт перенос/свёртка в ячейке [4, +]
+/// Грамматика дает конфликт перенос/свертка в ячейке [4, +]
 struct GLRParserTests {
     
     /// Одиночный операнд принимается
@@ -44,7 +44,7 @@ struct GLRParserTests {
         #expect(root.families.count == 1)
     }
     
-    /// Цепочка n + n + n даёт ровно две семьи в корне
+    /// Цепочка n + n + n дает ровно две семьи в корне
     @Test func threeOperandsAreAmbiguous() throws {
         let table = try sumTable()
         let lexemes = sumInput(operands: 3)
@@ -69,7 +69,7 @@ struct GLRParserTests {
         let forest = try parser.parse()
         let root = try #require(forest.root)
         
-        /// В каждой семье ровно три ребёнка: E + E
+        /// В каждой семье ровно три ребенка: E + E
         for family in root.families {
             #expect(family.children.count == 3)
             #expect(family.children[1].symbol == .terminal("+"))
@@ -105,7 +105,7 @@ struct GLRParserTests {
         #expect(leftLastOperand === rightLastOperand)
     }
     
-    /// Незавершённая цепочка отвергается
+    /// Незавершенная цепочка отвергается
     @Test func danglingOperatorFails() throws {
         let table = try sumTable()
         let broken = [lexeme("n", "n", 0), lexeme("+", "+", 1)]
@@ -116,7 +116,7 @@ struct GLRParserTests {
         }
     }
     
-    /// Лишний операнд без оператора отвергается на нём
+    /// Лишний операнд без оператора отвергается на нем
     @Test func missingOperatorFails() throws {
         let table = try sumTable()
         let broken = [lexeme("n", "n", 0), lexeme("n", "n", 1)]

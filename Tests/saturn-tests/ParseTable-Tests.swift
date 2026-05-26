@@ -12,7 +12,7 @@ import Testing
 struct ParseTableTests {
     
     /// Грамматика расширяется свежей стартовой продукцией с номером 0
-    /// её правая часть — пользовательская аксиома E
+    /// ее правая часть — пользовательская аксиома E
     @Test func testAxiomIsAugmented() throws {
         let grammar = ambiguousExpressionGrammar()
         let numbered = try NumberedGrammar(grammar)
@@ -34,12 +34,12 @@ struct ParseTableTests {
         #expect(follow["E"] == [.terminal("+"), .end])
     }
     
-    /// Неоднозначность даёт ячейку с конфликтом shift/reduce — оба действия присутствуют
+    /// Неоднозначность дает ячейку с конфликтом shift/reduce — оба действия присутствуют
     @Test func testShiftReduceConflictPresent() throws {
         let grammar = ambiguousExpressionGrammar()
         let table = try ParseTable(grammar, acceptsEmpty: false)
         
-        /// Ищем хоть одну ячейку, где одновременно есть перенос и свёртка
+        /// Ищем хоть одну ячейку, где одновременно есть перенос и свертка
         let hasConflict = table.action.values.contains { row in
             row.values.contains { cell in
                 let hasShift = cell.contains {
@@ -57,7 +57,7 @@ struct ParseTableTests {
         #expect(hasConflict, "Неоднозначная грамматика должна давать конфликт shift/reduce")
     }
     
-    /// В таблице есть приём по концу входа
+    /// В таблице есть прием по концу входа
     @Test func testAcceptOnEnd() throws {
         let grammar = ambiguousExpressionGrammar()
         let table = try ParseTable(grammar, acceptsEmpty: false)
@@ -69,7 +69,7 @@ struct ParseTableTests {
         #expect(hasAccept)
     }
     
-    /// Однозначная грамматика `S → a S | b` не даёт конфликтов:
+    /// Однозначная грамматика `S → a S | b` не дает конфликтов:
     /// каждая ячейка ACTION содержит ровно одно действие
     @Test func testDeterministicGrammarHasNoConflicts() throws {
         let s = Nonterm(name: "S")
@@ -99,7 +99,7 @@ struct ParseTableTests {
         #expect(maxCell == 1, "Однозначная грамматика не должна давать многозначных ячеек")
     }
     
-    /// Перенос по терминалу `n` ведёт в состояние, сворачивающее `E → n`:
+    /// Перенос по терминалу `n` ведет в состояние, сворачивающее `E → n`:
     /// проверяем согласованность shift и reduce через таблицу
     @Test func testShiftLeadsToReduceState() throws {
         let grammar = ambiguousExpressionGrammar()
@@ -122,7 +122,7 @@ struct ParseTableTests {
         #expect(reducesToProduction, "Состояние после переноса n должно сворачивать E → n")
     }
     
-    /// GOTO по нетерминалу E из стартового состояния определён
+    /// GOTO по нетерминалу E из стартового состояния определен
     @Test func testGotoOnNonterminal() throws {
         let grammar = ambiguousExpressionGrammar()
         let table = try ParseTable(grammar, acceptsEmpty: false)

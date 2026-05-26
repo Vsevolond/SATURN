@@ -94,7 +94,7 @@ struct ScannerTests {
         }
     }
     
-    /// Пустой вход даёт пустую последовательность лексем
+    /// Пустой вход дает пустую последовательность лексем
     @Test func testEmptyInputYieldsNoLexemes() throws {
         let scanner = try Scanner(
             tokens: [
@@ -107,7 +107,7 @@ struct ScannerTests {
         #expect(lexemes.isEmpty)
     }
     
-    /// Вход из одних пробелов также даёт пустую последовательность
+    /// Вход из одних пробелов также дает пустую последовательность
     @Test func testWhitespaceOnlyInputYieldsNoLexemes() throws {
         let scanner = try Scanner(
             tokens: [
@@ -136,7 +136,7 @@ struct ScannerTests {
     }
     
     /// Литералы-операторы, ключевое слово, числа,
-    /// идентификаторы — проверка имён и позиций в одном потоке
+    /// идентификаторы — проверка имен и позиций в одном потоке
     @Test func testRealisticTokenStream() throws {
         let scanner = try Scanner(
             tokens: [

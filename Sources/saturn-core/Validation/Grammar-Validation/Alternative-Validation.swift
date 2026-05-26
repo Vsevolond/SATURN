@@ -11,7 +11,7 @@ extension Specification {
     
     // MARK: - Type Entities
     
-    /// Вид обёртки группировки
+    /// Вид обертки группировки
     enum Wrapper {
         case array /// repeat(...)
         case optional /// optional[...] или хвост repeat[...]
@@ -20,7 +20,7 @@ extension Specification {
     /// Символ альтернативы в плоской нумерации
     struct FlatSymbol {
         let name: String /// имя токена или нетерминала
-        let wrappers: [Wrapper] /// обёртки изнутри наружу
+        let wrappers: [Wrapper] /// обертки изнутри наружу
         let isToken: Bool /// токен или нетерминал
     }
 
@@ -48,7 +48,7 @@ extension Specification {
     
     // MARK: - Private Methods
     
-    /// Разворачивает элементы альтернативы в плоский список с обёртками
+    /// Разворачивает элементы альтернативы в плоский список с обертками
     func flatten(_ productions: [Production], wrappers: [Wrapper] = []) -> [FlatSymbol] {
         var result: [FlatSymbol] = []
         

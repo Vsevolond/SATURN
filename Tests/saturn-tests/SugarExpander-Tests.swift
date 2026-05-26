@@ -91,7 +91,7 @@ struct SugarExpanderTests {
         #expect(result.map["S_opt_0"] == SugarSite(type: .optional, arity: 1))
     }
     
-    /// Группа из нескольких символов даёт арность по числу символов вхождения
+    /// Группа из нескольких символов дает арность по числу символов вхождения
     @Test func testGroupArity() {
         let s = Nonterm(name: "S")
         let alt = Alternative(

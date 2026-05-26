@@ -7,7 +7,7 @@
 
 import Foundation
 
-/// Описание служебного нетерминала, порождённого развёрткой сахара
+/// Описание служебного нетерминала, порожденного разверткой сахара
 public struct SugarSite: Equatable {
     
     // MARK: - Public Properties

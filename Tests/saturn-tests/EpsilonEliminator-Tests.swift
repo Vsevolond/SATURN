@@ -12,7 +12,7 @@ import Testing
 struct EpsilonEliminatorTests {
     
     /// `R → ε | C D R` теряет ε-альтернативу,
-    /// а родитель `S → A R` получает вариант без обнулённого `R`
+    /// а родитель `S → A R` получает вариант без обнуленного `R`
     @Test func testEliminatesEpsilonAndExpandsParent() throws {
         let r = Nonterm(name: "R")
         let s = Nonterm(name: "S")
@@ -120,7 +120,7 @@ struct EpsilonEliminatorTests {
         #expect(rules["Q"] == ["q"])
     }
     
-    /// Совпавшие варианты отсеиваются: `Y → A A` при обнуляемом `A` даёт
+    /// Совпавшие варианты отсеиваются: `Y → A A` при обнуляемом `A` дает
     /// `A A | A | (пусто)` — две одиночные `A` сливаются в одну, пустая убрана
     @Test func testDuplicateVariantsMerged() throws {
         let a = Nonterm(name: "A")
@@ -148,12 +148,12 @@ struct EpsilonEliminatorTests {
         let grammar = try EpsilonEliminator().eliminate(expanded)
         let rules = ruleSet(grammar.value)
         
-        /// Удаление левого и правого `A` даёт одинаковый `A` — остаётся один
+        /// Удаление левого и правого `A` дает одинаковый `A` — остается один
         #expect(rules["Y"] == ["A A", "A"])
     }
     
     /// Обнуляемая аксиома оборачивается в свежую `_Start → S`, которая
-    /// становится новой аксиомой и идёт первой в списке
+    /// становится новой аксиомой и идет первой в списке
     @Test func testNullableAxiomWrapped() throws {
         let s = Nonterm(name: "S")
         
@@ -179,7 +179,7 @@ struct EpsilonEliminatorTests {
         #expect(rules["S"] == ["a"])
     }
     
-    /// Действия исходной альтернативы переносятся в каждый порождённый вариант без изменений
+    /// Действия исходной альтернативы переносятся в каждый порожденный вариант без изменений
     @Test func testActionsCarriedToAllVariants() throws {
         let action = Statement.call(method: "log", arguments: [.int(1)])
         let r = Nonterm(name: "R")
@@ -206,8 +206,8 @@ struct EpsilonEliminatorTests {
         let expanded = ExpandedGrammar(axiom: s, nonterms: [s, r])
         let grammar = try EpsilonEliminator().eliminate(expanded)
         
-        /// `S → R` обнуляемо по `R`, но сам `S` после удаления `R` даёт пустую правую часть, которая убирается.
-        /// Остаётся единственная `S → R` с сохранёнными действиями
+        /// `S → R` обнуляемо по `R`, но сам `S` после удаления `R` дает пустую правую часть, которая убирается.
+        /// Остается единственная `S → R` с сохраненными действиями
         let s2 = grammar.value["S"]
         #expect(s2?.disclosures.count == 1)
         #expect(s2?.disclosures.first?.actions == [action])

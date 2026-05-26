@@ -39,7 +39,7 @@ struct AttributeType: Parser {
             }
         }
         .map { base, optional, dimensions in
-            /// Базовый тип, при необходимости обёрнутый в опционал
+            /// Базовый тип, при необходимости обернутый в опционал
             let base = optional == nil ? base : .optional(base)
             
             /// Каждая пара `[]` оборачивает текущий тип в массив,

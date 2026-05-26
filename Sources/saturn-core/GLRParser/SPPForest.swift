@@ -7,10 +7,10 @@
 
 import Foundation
  
-/// Разделённый упакованный лес разбора
+/// Разделенный упакованный лес разбора
 ///
 /// Узел помечен тройкой (символ, начало, конец)
-/// Семья хранит полный список детей продукции и её номер
+/// Семья хранит полный список детей продукции и ее номер
 public final class SPPForest {
     
     // MARK: - Public Properties
@@ -66,12 +66,12 @@ extension SPPForest {
     
     // MARK: - Type Entities
     
-    /// Семья детей узла: одна продукция и порядок порождённых узлов
+    /// Семья детей узла: одна продукция и порядок порожденных узлов
     public struct Family: Equatable {
         
         // MARK: - Public Properties
         
-        /// Номер свёрнутой продукции
+        /// Номер свернутой продукции
         public let production: Int
         
         /// Дети в порядке правой части продукции
@@ -126,7 +126,7 @@ extension SPPForest {
             self.families = []
         }
         
-        /// Нетерминальный узел без семей; семьи добавляются по мере свёрток
+        /// Нетерминальный узел без семей; семьи добавляются по мере сверток
         init(nonterminal symbol: GrammarSymbol, start: Int, end: Int) {
             self.symbol = symbol
             self.lexeme = nil
@@ -137,7 +137,7 @@ extension SPPForest {
         
         // MARK: - Internal Methods
         
-        /// Добавляет семью, если такой ещё нет
+        /// Добавляет семью, если такой еще нет
         func add(_ family: Family) {
             guard !families.contains(family) else { return }
             

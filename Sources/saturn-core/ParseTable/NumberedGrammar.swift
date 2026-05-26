@@ -37,7 +37,7 @@ public struct NumberedGrammar {
         
         let names = Set(grammar.nonterms.map(\.name))
                 
-        /// Свежая аксиома `S' → axiom` с номером 0 — единственная точка приёма
+        /// Свежая аксиома `S' → axiom` с номером 0 — единственная точка приема
         let start = startName(taken: names)
         nonterminals.insert(start)
         
@@ -48,7 +48,7 @@ public struct NumberedGrammar {
         )
         productions.append(production)
         
-        /// Аксиома обрабатывается первой — её продукции получают младшие номера
+        /// Аксиома обрабатывается первой — ее продукции получают младшие номера
         /// Продукция 0 стартовая
         let ordered = [grammar.axiom] + grammar.nonterms.filter { $0.name != grammar.axiom.name }
         
@@ -62,7 +62,7 @@ public struct NumberedGrammar {
                 /// Собираем терминалы из правых частей
                 for case let .terminal(name) in rhs { terminals.insert(name) }
                 
-                /// Номер продукции — её текущая позиция в общем списке
+                /// Номер продукции — ее текущая позиция в общем списке
                 let production = NumberedProduction(
                     id: productions.count,
                     lhs: nonterm.name,
