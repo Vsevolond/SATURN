@@ -16,18 +16,16 @@ public struct Alternative: Equatable {
     /// Последовательность семантических действий
     public let actions: [Statement]
     
-    /// Позиции выпавшего обнуляемого сахара в исходной правой части
-    ///
-    /// По этим меткам свёртка дерева восстанавливает пустой узел-повторение,
-    /// сохраняя позиционную адресацию символов правила
-    public let dropped: [DroppedSugar]
+    /// Позиции выпавших обнуляемых символов в исходной правой части
+    /// По этим меткам свертка дерева восстанавливает исходную нумерацию символов правила
+    public let dropped: [DroppedSymbol]
     
     // MARK: - Initializers
     
     public init(
         elements: [Production] = [],
         actions: [Statement] = [],
-        dropped: [DroppedSugar] = []
+        dropped: [DroppedSymbol] = []
     ) {
         self.elements = elements
         self.actions = actions
@@ -37,7 +35,7 @@ public struct Alternative: Equatable {
     public init(
         elements: [Production] = [],
         actions: [Statement]? = nil,
-        dropped: [DroppedSugar] = []
+        dropped: [DroppedSymbol] = []
     ) {
         self.elements = elements
         self.actions = actions ?? []
@@ -51,15 +49,18 @@ extension Alternative {
     
     // MARK: - Type Entities
     
-    /// Выпавший при устранении ε обнуляемый служебный нетерминал сахара
-    public struct DroppedSugar: Equatable {
+    /// Выпавший при устранении ε обнуляемый символ правой части
+    public struct DroppedSymbol: Equatable {
         
         // MARK: - Public Properties
         
         /// Исходный индекс символа в правой части до удаления
         public let position: Int
         
-        /// Имя служебного нетерминала — ключ в карте развёртки
+        /// Имя символа — для сахара это ключ в карте развертки
         public let name: String
+        
+        /// Служебный ли это нетерминал развертки сахара
+        public let isSugar: Bool
     }
 }

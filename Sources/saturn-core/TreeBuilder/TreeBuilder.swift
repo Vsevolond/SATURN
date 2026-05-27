@@ -18,7 +18,7 @@ public struct TreeBuilder {
     /// Карта развертки: имя служебного нетерминала → описание породившего сахара
     private let map: ExpansionMap
     
-    /// Занумерованные продукции — по номеру свёрнутого правила доступны метки выпавшего сахара
+    /// Занумерованные продукции — по номеру свернутого правила доступны метки выпавшего сахара
     private let productions: [NumberedProduction]
     
     // MARK: - Initializers
@@ -101,25 +101,41 @@ public struct TreeBuilder {
         /// Обычное правило без выпавшего сахара — детей не трогаем
         guard !dropped.isEmpty else { return children }
         
-        var restored = children
+        /// Исходная длина правой части — присутствующие + все выпавшие
+        let total = children.count + dropped.count
         
-        for sugar in dropped.sorted(by: { $0.position < $1.position }) {
-            /// Описание сахара берём из карты; без него вставлять нечего
-            guard let site = map[sugar.name] else { continue }
+        /// Слоты выпавших символов по исходным позициям
+        var droppedAt: [Int: Alternative.DroppedSymbol] = [:]
+        
+        for symbol in dropped { droppedAt[symbol.position] = symbol }
+        
+        var restored: [ParseTree.Child] = []
+        var next = 0
+        
+        for position in 0..<total {
+            /// Выпавший символ на этой позиции
+            if let symbol = droppedAt[position] {
+                /// Сахар получает пустой узел-якорь, обычный символ слот не занимает
+                if let site = map[symbol.name] {
+                    let empty = ParseTree.Repetition(
+                        kind: site.type,
+                        arity: site.arity,
+                        items: [],
+                        start: end,
+                        end: end
+                    )
+                    
+                    restored.append(.repetition(empty))
+                }
+                
+                continue
+            }
             
-            /// Пустое повторение не покрывает лексем — вырожденный диапазон на крае узла
-            let empty = ParseTree.Repetition(
-                kind: site.type,
-                arity: site.arity,
-                items: [],
-                start: end,
-                end: end
-            )
+            /// Присутствующий символ — берем следующего фактического ребенка
+            let child = children[next]
             
-            restored.insert(
-                .repetition(empty),
-                at: min(sugar.position, restored.count)
-            )
+            restored.append(child)
+            next += 1
         }
         
         return restored

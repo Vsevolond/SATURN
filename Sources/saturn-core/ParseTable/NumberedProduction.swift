@@ -21,8 +21,8 @@ public struct NumberedProduction: Equatable {
     /// Правая часть — последовательность символов грамматики
     public let rhs: [GrammarSymbol]
     
-    /// Позиции выпавшего обнуляемого сахара
-    public let dropped: [Alternative.DroppedSugar]
+    /// Позиции выпавших обнуляемых символов
+    public let dropped: [Alternative.DroppedSymbol]
     
     // MARK: - Initializers
     
@@ -30,7 +30,7 @@ public struct NumberedProduction: Equatable {
         id: Int,
         lhs: String,
         rhs: [GrammarSymbol],
-        dropped: [Alternative.DroppedSugar] = []
+        dropped: [Alternative.DroppedSymbol] = []
     ) {
         self.id = id
         self.lhs = lhs

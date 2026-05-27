@@ -198,6 +198,60 @@ struct TreeBuilderTests {
         }
     }
     
+    /// Выпавший обычный обнуляемый нетерминал не занимает слот в children
+    @Test func droppedOrdinaryNonterminalLeavesGap() throws {
+        /// Greeting → sal Name punct
+        /// Name → first | ε
+        /// Name обнуляем явным ε и не является сахаром
+        let name = Nonterm(name: "Name")
+        name.add([
+            Alternative(
+                elements: [
+                    .term("first")
+                ]
+            ),
+            Alternative()
+        ])
+
+        let greeting = Nonterm(name: "Greeting")
+        greeting.add(
+            Alternative(
+                elements: [
+                    .term("sal"),
+                    .nonterm(name),
+                    .term("punct")
+                ]
+            )
+        )
+
+        /// Вход без Name: sal punct
+        let tree = try buildTree(
+            axiom: greeting,
+            input: [
+                lexeme("sal", 0),
+                lexeme("punct", 1)
+            ]
+        )
+
+        #expect(tree.symbol == "Greeting")
+
+        /// Name выпал и не сахар — якоря нет, в children только два присутствующих символа
+        #expect(tree.children.count == 2)
+
+        guard case .token(let first) = tree.children[0] else {
+            Issue.record("первый ребенок не терминал")
+            return
+        }
+        guard case .token(let second) = tree.children[1] else {
+            Issue.record("второй ребенок не терминал")
+            return
+        }
+
+        /// Порядок сохранен: sal и punct, без пустого узла между ними
+        #expect(first.name == "sal")
+        #expect(second.name == "punct")
+    }
+    
     // MARK: - Private Methods
     
     /// Лексема терминала с тривиальной позицией

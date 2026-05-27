@@ -90,7 +90,7 @@ extension Specification {
     
     // MARK: - Private Methods
     
-    /// Тип ссылки при ЧТЕНИИ, с обертками группировок
+    /// Тип ссылки при ЧТеИИ, с обертками группировок
     private func inferReferenceType(
         _ reference: Reference,
         in context: Context
@@ -157,7 +157,7 @@ extension Specification {
         }
     }
     
-    /// Тип при ЧТЕНИИ: снятие subscript + наложение оберток группировок
+    /// Тип при ЧТеИИ: снятие subscript + наложение оберток группировок
     private func referenceType(
         _ reference: Reference,
         wrappers: [Wrapper],

@@ -173,20 +173,23 @@ public struct EpsilonEliminator {
             guard !seen.contains(shape) else { continue }
             seen.insert(shape)
             
-            /// Метки выпавшего сахара: исходная позиция и имя — только для служебных нетерминалов развёртки
-            let droppedSugar = try dropped.sorted()
-                .compactMap { index -> Alternative.DroppedSugar? in
+            /// Метки выпавших обнуляемых символов: исходная позиция, имя и признак сахара
+            let droppedSymbols = try dropped.sorted()
+                .map { index in
                     let name = try elements[index].symbolKey
+                    let isSugar = (map[name] != nil)
                     
-                    guard map[name] != nil else { return nil }
-                    
-                    return Alternative.DroppedSugar(position: index, name: name)
+                    return Alternative.DroppedSymbol(
+                        position: index,
+                        name: name,
+                        isSugar: isSugar
+                    )
                 }
             
             let alternative = Alternative(
                 elements: remaining,
                 actions: alternative.actions,
-                dropped: droppedSugar
+                dropped: droppedSymbols
             )
             
             results.append(alternative)
