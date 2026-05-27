@@ -12,15 +12,15 @@ extension Specification {
     // MARK: - Private Methods
     
     /// Токены: уникальность имен и значений.
-    func validateTokens() -> (tokens: Set<String>, errors: [SemanticError]) {
-        var errors: [SemanticError] = []
+    func validateTokens() -> (tokens: Set<String>, errors: [ValidationError]) {
+        var errors: [ValidationError] = []
         
         var names: Set<String> = []
         
         /// Проверка уникальности имен
         for token in tokens {
             if names.contains(token.name) {
-                let error = SemanticError.duplicateTokenName(token.name)
+                let error = ValidationError.duplicateTokenName(token.name)
                 errors.append(error)
             }
             
@@ -30,7 +30,7 @@ extension Specification {
         /// Проверка уникальности значений
         for i in tokens.indices {
             for j in tokens.indices where j > i && tokens[i].value == tokens[j].value {
-                let error = SemanticError.duplicateTokenValue(
+                let error = ValidationError.duplicateTokenValue(
                     first: tokens[i].name,
                     second: tokens[j].name
                 )

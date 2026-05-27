@@ -16,18 +16,18 @@ extension Specification {
         arguments: [Expression],
         returnRequired: Bool,
         in context: Context
-    ) -> (returnType: Property.Kind?, errors: [SemanticError]) {
+    ) -> (returnType: Property.Kind?, errors: [ValidationError]) {
         /// Проверка существования метода по имени
         guard let declaration = methods[method] else {
-            let error = SemanticError.unknownMethod(name: method, nonterm: context.nonterm.name)
+            let error = ValidationError.unknownMethod(name: method, nonterm: context.nonterm.name)
             return (nil, [error])
         }
         
-        var errors: [SemanticError] = []
+        var errors: [ValidationError] = []
         
         /// Проверка соответствия количества аргументов
         if arguments.count != declaration.arguments.count {
-            let error = SemanticError.argumentCountMismatch(
+            let error = ValidationError.argumentCountMismatch(
                 method: method,
                 expected: declaration.arguments.count,
                 given: arguments.count,
@@ -46,7 +46,7 @@ extension Specification {
             
             /// Если тип переданного аргумента невозможно присвоить типу аргумента метода
             if let argumentType = result.type, !argumentType.assignable(to: type) {
-                let error = SemanticError.argumentTypeMismatch(
+                let error = ValidationError.argumentTypeMismatch(
                     method: method,
                     index: index,
                     expected: type.identifier,
@@ -65,7 +65,7 @@ extension Specification {
         } else {
             /// Если возвращаемый тип важен
             if returnRequired {
-                let error = SemanticError.voidMethodInExpression(
+                let error = ValidationError.voidMethodInExpression(
                     method: method,
                     nonterm: context.nonterm.name
                 )

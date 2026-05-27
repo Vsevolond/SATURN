@@ -12,8 +12,8 @@ extension Specification {
     // MARK: - Internal Methods
     
     /// Известность терминалов и непустота альтернатив у достижимых нетерминалов
-    func validateGrammar(_ uniqueTokens: Set<String>) -> [SemanticError] {
-        var errors: [SemanticError] = []
+    func validateGrammar(_ uniqueTokens: Set<String>) -> [ValidationError] {
+        var errors: [ValidationError] = []
         
         var visited: Set<ObjectIdentifier> = []
         var stack: [Nonterm] = [axiom]
@@ -26,14 +26,14 @@ extension Specification {
             
             /// Достижимый нетерминал без альтернатив
             if nonterm.disclosures.isEmpty {
-                let error = SemanticError.emptyNonterm(name: nonterm.name)
+                let error = ValidationError.emptyNonterm(name: nonterm.name)
                 errors.append(error)
             }
             
             for alternative in nonterm.disclosures {
                 /// Структура альтернативы — все терминалы объявлены
                 for term in terms(in: alternative.elements) where !uniqueTokens.contains(term) {
-                    let error = SemanticError.unknownTerm(name: term)
+                    let error = ValidationError.unknownTerm(name: term)
                     errors.append(error)
                 }
                 

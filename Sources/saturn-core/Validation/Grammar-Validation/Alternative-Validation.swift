@@ -33,8 +33,8 @@ extension Specification {
     // MARK: - Internal Methods
     
     /// Альтернатива: валидация выражений и полнота
-    func validateAlternative(_ alternative: Alternative, of nonterm: Nonterm) -> [SemanticError] {
-        var errors: [SemanticError] = []
+    func validateAlternative(_ alternative: Alternative, of nonterm: Nonterm) -> [ValidationError] {
+        var errors: [ValidationError] = []
         
         let symbols = flatten(alternative.elements)
         let context = Context(nonterm: nonterm, symbols: symbols)

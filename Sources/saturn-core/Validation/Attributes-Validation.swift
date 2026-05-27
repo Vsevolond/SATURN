@@ -15,15 +15,15 @@ extension Specification {
     /// - Типы опираются на известные
     /// - Нет дублей атрибутов
     /// - У токенов не может быть пользовательских атрибутов
-    func validateAttributes(_ uniqueTokens: Set<String>) -> [SemanticError] {
-        var errors: [SemanticError] = []
+    func validateAttributes(_ uniqueTokens: Set<String>) -> [ValidationError] {
+        var errors: [ValidationError] = []
         
         for (symbol, listOfAttributes) in attributes {
             /// Если символ — токен
             if uniqueTokens.contains(symbol) {
                 /// Проходим по всем атрибутам
                 for attribute in listOfAttributes {
-                    let error = SemanticError.tokenAttributeNotAllowed(
+                    let error = ValidationError.tokenAttributeNotAllowed(
                         attribute: attribute.property.name,
                         token: symbol
                     )
@@ -37,7 +37,7 @@ extension Specification {
                 for attribute in listOfAttributes {
                     /// Если базовый тип неизвестен
                     if let unknown = unknownBaseType(of: attribute.property.type) {
-                        let error = SemanticError.unknownAttributeType(
+                        let error = ValidationError.unknownAttributeType(
                             name: unknown,
                             symbol: symbol,
                             attribute: attribute.property.name
@@ -52,7 +52,7 @@ extension Specification {
                     for j in listOfAttributes.indices where j > i {
                         /// Если совпадают имена атрибутов
                         if listOfAttributes[i].property.name == listOfAttributes[j].property.name {
-                            let error = SemanticError.duplicateAttribute(
+                            let error = ValidationError.duplicateAttribute(
                                 name: listOfAttributes[i].property.name,
                                 symbol: symbol
                             )

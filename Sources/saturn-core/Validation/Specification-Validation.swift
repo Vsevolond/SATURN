@@ -13,8 +13,8 @@ extension Specification {
     
     /// Выполняет полный семантический анализ спецификации
     /// Возвращает все найденные ошибки
-    public func validate() -> [SemanticError] {
-        var errors: [SemanticError] = []
+    public func validate() -> [ValidationError] {
+        var errors: [ValidationError] = []
         
         /// Валидация объявлений токенов
         let tokensValidation = validateTokens()

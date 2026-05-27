@@ -15,7 +15,7 @@ extension Specification {
     func inferType(
         _ expression: Expression,
         in context: Context
-    ) -> (type: Property.Kind?, errors: [SemanticError]) {
+    ) -> (type: Property.Kind?, errors: [ValidationError]) {
         switch expression {
         case .int: return (.int, [])
         case .float: return (.float, [])
@@ -47,7 +47,7 @@ extension Specification {
             
             /// Опциональный операнд запрещен
             if leftType.isOptional || rightType.isOptional {
-                let error = SemanticError.optionalInBinary(
+                let error = ValidationError.optionalInBinary(
                     operator: operation.rawValue,
                     left: leftType.identifier,
                     right: rightType.identifier,
@@ -62,7 +62,7 @@ extension Specification {
             guard let resultType = binaryResultType(leftType, operation, rightType) else {
                 /// Если один из типов не числовой
                 if leftType.isNumeric != rightType.isNumeric {
-                    let error = SemanticError.binaryTypeMismatch(
+                    let error = ValidationError.binaryTypeMismatch(
                         operator: operation.rawValue,
                         left: leftType.identifier,
                         right: rightType.identifier,
@@ -72,7 +72,7 @@ extension Specification {
                 
                 /// Иначе — оператор несовместим
                 } else {
-                    let error = SemanticError.operatorNotApplicable(
+                    let error = ValidationError.operatorNotApplicable(
                         operator: operation.rawValue,
                         left: leftType.identifier,
                         right: rightType.identifier,
@@ -90,11 +90,11 @@ extension Specification {
     
     // MARK: - Private Methods
     
-    /// Тип ссылки при ЧТеИИ, с обертками группировок
+    /// Тип ссылки при ЧТЕНИИ, с обертками группировок
     private func inferReferenceType(
         _ reference: Reference,
         in context: Context
-    ) -> (type: Property.Kind?, errors: [SemanticError]) {
+    ) -> (type: Property.Kind?, errors: [ValidationError]) {
         /// Если указывает на левую часть `$0`
         if reference.target == 0 {
             /// Проверяем, что атрибут существует
@@ -103,7 +103,7 @@ extension Specification {
                 of: context.nonterm.name,
                 isToken: false
             ) else {
-                let error = SemanticError.unknownAttribute(
+                let error = ValidationError.unknownAttribute(
                     target: reference.target,
                     attribute: reference.attribute,
                     nonterm: context.nonterm.name
@@ -123,7 +123,7 @@ extension Specification {
         } else {
             /// Проверяем, что `N` не выходит за границы
             guard let symbol = resolveSymbol(reference.target, in: context) else {
-                let error = SemanticError.referenceOutOfBounds(
+                let error = ValidationError.referenceOutOfBounds(
                     target: reference.target,
                     count: context.symbols.count,
                     nonterm: context.nonterm.name
@@ -138,7 +138,7 @@ extension Specification {
                 of: symbol.name,
                 isToken: symbol.isToken
             ) else {
-                let error = SemanticError.unknownAttribute(
+                let error = ValidationError.unknownAttribute(
                     target: reference.target,
                     attribute: reference.attribute,
                     symbol: symbol.name,
@@ -157,13 +157,13 @@ extension Specification {
         }
     }
     
-    /// Тип при ЧТеИИ: снятие subscript + наложение оберток группировок
+    /// Тип при ЧТЕНИИ: снятие subscript + наложение оберток группировок
     private func referenceType(
         _ reference: Reference,
         wrappers: [Wrapper],
         baseType: Property.Kind,
         in context: Context
-    ) -> (type: Property.Kind?, errors: [SemanticError]) {
+    ) -> (type: Property.Kind?, errors: [ValidationError]) {
         /// Снимаем subscripts, чтобы получить базовый тип
         let unfold = unfoldSubscripts(
             reference,

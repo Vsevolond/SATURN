@@ -12,14 +12,14 @@ extension Specification {
     // MARK: - Internal Methods
     
     /// Методы: типы аргументов и возврата опираются на известные
-    func validateMethodTypes() -> [SemanticError] {
-        var errors: [SemanticError] = []
+    func validateMethodTypes() -> [ValidationError] {
+        var errors: [ValidationError] = []
         
         for (name, method) in methods {
             /// Проверка типов аргументов
             for type in method.arguments {
                 if let unknown = unknownBaseType(of: type) {
-                    let error = SemanticError.unknownArgumentType(
+                    let error = ValidationError.unknownArgumentType(
                         name: unknown,
                         method: name
                     )
@@ -32,7 +32,7 @@ extension Specification {
             if let returnType = method.returnType,
                let unknown = unknownBaseType(of: returnType)
             {
-                let error = SemanticError.unknownReturnType(
+                let error = ValidationError.unknownReturnType(
                     name: unknown,
                     method: name
                 )

@@ -1,5 +1,5 @@
 //
-//  Specification-SemanticError.swift
+//  Specification-ValidationError.swift
 //  saturn
 //
 //  Created by Vsevolod Donchenko on 21.05.2026.
@@ -10,7 +10,7 @@ import Foundation
 extension Specification {
     
     /// Ошибка семантического анализа спецификации
-    public enum SemanticError: Error, Equatable {
+    public enum ValidationError: Error, Equatable {
         
         // MARK: - Token errors
         

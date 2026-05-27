@@ -67,7 +67,8 @@ public struct NumberedGrammar {
                     id: productions.count,
                     lhs: nonterm.name,
                     rhs: rhs,
-                    dropped: alternative.dropped
+                    dropped: alternative.dropped,
+                    actions: alternative.actions
                 )
                 
                 productions.append(production)

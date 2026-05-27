@@ -12,7 +12,7 @@ extension Specification {
     // MARK: - Internal Methods
     
     /// Выражение: валидация вызова метода или присваивания
-    func validateStatement(_ statement: Statement, in context: Context) -> [SemanticError] {
+    func validateStatement(_ statement: Statement, in context: Context) -> [ValidationError] {
         switch statement {
         case .call(let method, let arguments):
             /// `returnType` игнорируется
@@ -63,8 +63,8 @@ extension Specification {
         _ reference: Reference,
         baseType: Property.Kind,
         in context: Context
-    ) -> (type: Property.Kind?, errors: [SemanticError]) {
-        var errors: [SemanticError] = []
+    ) -> (type: Property.Kind?, errors: [ValidationError]) {
+        var errors: [ValidationError] = []
         var type = baseType
         
         for index in reference.subscripts {
@@ -74,7 +74,7 @@ extension Specification {
             
             /// Если тип не `int`
             if result.type != .int {
-                let error = SemanticError.subscriptIndexNotInt(
+                let error = ValidationError.subscriptIndexNotInt(
                     target: reference.target,
                     attribute: reference.attribute,
                     nonterm: context.nonterm.name
@@ -85,7 +85,7 @@ extension Specification {
             
             /// Базовый тип (или на прошлом шаге) должен быть `array`
             guard case .array(let nested) = type else {
-                let error = SemanticError.subscriptOnNonArray(
+                let error = ValidationError.subscriptOnNonArray(
                     target: reference.target,
                     attribute: reference.attribute,
                     nonterm: context.nonterm.name
@@ -108,8 +108,8 @@ extension Specification {
         reference: Reference,
         value: Expression,
         in context: Context
-    ) -> [SemanticError] {
-        var errors: [SemanticError] = []
+    ) -> [ValidationError] {
+        var errors: [ValidationError] = []
         
         /// Если указывает на левую часть `$0`
         if reference.target == 0 {
@@ -120,7 +120,19 @@ extension Specification {
                 isToken: false
             ) else {
                 return [
-                    SemanticError.unknownAttribute(
+                    ValidationError.unknownAttribute(
+                        target: reference.target,
+                        attribute: reference.attribute,
+                        nonterm: context.nonterm.name
+                    )
+                ]
+            }
+            
+            /// Наследуемый атрибут левой части задается родителем
+            /// Аксиома — исключение, она сама задает свои наследуемые атрибуты
+            if attribute.type == .inherited, context.nonterm.name != axiom.name {
+                return [
+                    ValidationError.illegalAssignment(
                         target: reference.target,
                         attribute: reference.attribute,
                         nonterm: context.nonterm.name
@@ -155,7 +167,7 @@ extension Specification {
             /// Проверяем, что `N` не выходит за границы
             guard let symbol = resolveSymbol(reference.target, in: context) else {
                 return [
-                    SemanticError.referenceOutOfBounds(
+                    ValidationError.referenceOutOfBounds(
                         target: reference.target,
                         count: context.symbols.count,
                         nonterm: context.nonterm.name
@@ -170,7 +182,7 @@ extension Specification {
                 isToken: symbol.isToken
             ) else {
                 return [
-                    SemanticError.unknownAttribute(
+                    ValidationError.unknownAttribute(
                         target: reference.target,
                         attribute: reference.attribute,
                         symbol: symbol.name,
@@ -183,7 +195,7 @@ extension Specification {
             /// У токена единственный синтезированный атрибут - только читаемый
             /// У нетерминалов синтезированные атрибуты вычисляются в их правилах
             if attribute.type != .inherited {
-                let error = SemanticError.illegalAssignment(
+                let error = ValidationError.illegalAssignment(
                     target: reference.target,
                     attribute: reference.attribute,
                     nonterm: context.nonterm.name
@@ -221,7 +233,7 @@ extension Specification {
         value: Expression,
         targetType: Property.Kind,
         in context: Context
-    ) -> [SemanticError] {
+    ) -> [ValidationError] {
         let result = inferType(value, in: context)
         var errors = result.errors
         
@@ -229,7 +241,7 @@ extension Specification {
         
         /// Если типы несовместимы при присваивании
         if !type.assignable(to: targetType) {
-            let error = SemanticError.assignmentTypeMismatch(
+            let error = ValidationError.assignmentTypeMismatch(
                 target: reference.target,
                 attribute: reference.attribute,
                 expected: targetType.identifier,

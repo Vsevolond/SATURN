@@ -24,17 +24,22 @@ public struct NumberedProduction: Equatable {
     /// Позиции выпавших обнуляемых символов
     public let dropped: [Alternative.DroppedSymbol]
     
+    /// Семантические действия правила
+    public let actions: [Statement]
+    
     // MARK: - Initializers
     
     init(
         id: Int,
         lhs: String,
         rhs: [GrammarSymbol],
-        dropped: [Alternative.DroppedSymbol] = []
+        dropped: [Alternative.DroppedSymbol] = [],
+        actions: [Statement] = []
     ) {
         self.id = id
         self.lhs = lhs
         self.rhs = rhs
         self.dropped = dropped
+        self.actions = actions
     }
 }

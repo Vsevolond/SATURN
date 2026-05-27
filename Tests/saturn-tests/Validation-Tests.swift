@@ -985,7 +985,7 @@ struct ValidationTests {
     // MARK: - Private Methods
 
     /// Возвращает семантические ошибки спецификации или ошибку парсинга
-    private func errors(_ source: String) -> [Specification.SemanticError] {
+    private func errors(_ source: String) -> [Specification.ValidationError] {
         do {
             let spec = try Specification.parse(source)
             return spec.validate()
@@ -998,8 +998,8 @@ struct ValidationTests {
 
     /// Проверяет содержание указанной ошибки в переданном массиве ошибок
     private func assert(
-        _ errors: [Specification.SemanticError],
-        contains error: Specification.SemanticError
+        _ errors: [Specification.ValidationError],
+        contains error: Specification.ValidationError
     ) {
         #expect(
             errors.contains { $0 == error },
@@ -1009,8 +1009,8 @@ struct ValidationTests {
 
     /// Проверяет отсутствие указанной ошибки в переданном массиве ошибок
     private func assert(
-        _ errors: [Specification.SemanticError],
-        excludes error: Specification.SemanticError
+        _ errors: [Specification.ValidationError],
+        excludes error: Specification.ValidationError
     ) {
         #expect(
             !errors.contains { $0 == error },
