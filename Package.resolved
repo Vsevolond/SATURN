@@ -1,6 +1,15 @@
 {
-  "originHash" : "e91e83d6ce2a4307e6e10d4b1ec140139923178833ecb60489b24bea81c84cca",
+  "originHash" : "39e94d5d77b5c1c4c9e29d959ffb2362b3aceba98eee98df34adb9b8a9031fb2",
   "pins" : [
+    {
+      "identity" : "graphviz",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/SwiftDocOrg/GraphViz",
+      "state" : {
+        "revision" : "74b6cbd8c5ecea9f64d84c4e1c88d65604dd033f",
+        "version" : "0.4.1"
+      }
+    },
     {
       "identity" : "swift-argument-parser",
       "kind" : "remoteSourceControl",

@@ -40,3 +40,52 @@ public enum EvaluateError: Error, Equatable {
     /// Циклическая зависимость атрибутов
     case cyclicDependency(attribute: String? = nil, nonterm: String)
 }
+
+// MARK: - Extensions
+
+extension EvaluateError: LocalizedError {
+    
+    // MARK: - Public Properties
+    
+    /// Описание ошибки вычисления атрибутов
+    public var errorDescription: String? {
+        switch self {
+        case .runtimeUnavailable:
+            return "Среда выполнения JavaScript недоступна — невозможно загрузить semantics.js"
+            
+        case .scriptError(let message):
+            return "Ошибка при загрузке semantics.js: \(message)"
+            
+        case .methodNotFound(let name):
+            return "Метод «\(name)» не объявлен в semantics.js"
+            
+        case .methodFailed(let name, let message):
+            return "Метод «\(name)» завершился исключением: \(message)"
+            
+        case .undefinedInExpression(let nonterm):
+            return "В правиле «\(nonterm)» отсутствующее значение использовано в арифметике или присваивании"
+            
+        case .referenceOutOfBounds(let target, let nonterm):
+            return "Ссылка $\(target) в правиле «\(nonterm)» выходит за границы правой части"
+            
+        case .subscriptOutOfBounds(let target, let attribute):
+            return "Индекс сабскрипта у $\(target).\(attribute) вышел за границы массива"
+            
+        case .attributeNotComputed(let target, let attribute, let nonterm):
+            let owner = target == 0 ? "$0" : "$\(target)"
+            
+            return "В правиле «\(nonterm)» читается атрибут \(owner).\(attribute), который еще не вычислен"
+            
+        case .divisionByZero(let nonterm):
+            return "Деление на ноль в арифметическом выражении правила «\(nonterm)»"
+            
+        case .cyclicDependency(let attribute, let nonterm):
+            if let attribute {
+                return "Циклическая зависимость атрибута «\(attribute)» в правиле «\(nonterm)»"
+                
+            } else {
+                return "Циклическая зависимость атрибутов через спуск в правило «\(nonterm)»"
+            }
+        }
+    }
+}

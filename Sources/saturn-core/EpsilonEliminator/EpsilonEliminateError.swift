@@ -16,3 +16,21 @@ public enum EpsilonEliminateError: Error {
     /// Аксиома не найдена
     case axiomNotFound
 }
+
+// MARK: - Extensions
+
+extension EpsilonEliminateError: LocalizedError {
+    
+    // MARK: - Public Properties
+    
+    /// Описание ошибки устранения ε-правил
+    public var errorDescription: String? {
+        switch self {
+        case .sugarNotExpanded:
+            return "Синтаксический сахар должен быть развернут до устранения ε-правил"
+            
+        case .axiomNotFound:
+            return "Аксиома грамматики не найдена"
+        }
+    }
+}

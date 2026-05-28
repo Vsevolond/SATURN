@@ -42,16 +42,30 @@ public final class Evaluator {
     /// Атрибуты в процессе вычисления — повторный запрос означает цикл зависимости
     private var computing: Set<AttributeKey> = []
     
+    /// Индекс имен узлов для согласованного именования в графе и сериализации
+    private let nodeIndex: NodeIndex?
+    
+    /// Узлы графа зависимостей атрибутов, накопленные во время обхода
+    private var graphNodes: Set<DependencyGraph.AttributeNode> = []
+    
+    /// Ребра графа зависимостей: значение источника требовалось для вычисления цели
+    private var graphEdges: Set<DependencyGraph.Edge> = []
+    
+    /// Стек целей присваивания — верхний элемент получает входящие ребра при чтении
+    private var targetStack: [DependencyGraph.AttributeNode] = []
+    
     // MARK: - Initializers
     
     public init(
         specification: Specification,
         productions: [NumberedProduction],
-        runtime: SemanticRuntime
+        runtime: SemanticRuntime,
+        nodeIndex: NodeIndex? = nil
     ) {
         self.specification = specification
         self.productions = productions
         self.runtime = runtime
+        self.nodeIndex = nodeIndex
     }
     
     // MARK: - Public Methods
@@ -62,6 +76,21 @@ public final class Evaluator {
         let identity = ObjectIdentifier(tree)
         
         return synthesized[identity] ?? [:]
+    }
+    
+    /// Вычисляет атрибуты дерева и возвращает полный результат: значения и граф зависимостей
+    public func evaluateAll(_ tree: ParseTree) throws -> EvaluateResult {
+        try visit(tree)
+        
+        let identity = ObjectIdentifier(tree)
+        let graph = DependencyGraph(nodes: graphNodes, edges: graphEdges)
+        
+        return EvaluateResult(
+            rootAttributes: synthesized[identity] ?? [:],
+            synthesizedByNode: synthesized,
+            inheritedByNode: inherited,
+            dependencyGraph: graph
+        )
     }
     
     // MARK: - Private Methods
@@ -106,10 +135,22 @@ public final class Evaluator {
                 present.append(.single(child))
                 
             case .repetition(let repetition):
-                /// Символ на позиции column внутри витка дает значения по всем виткам
-                for column in 0..<repetition.arity {
-                    let values = repetition.items.map { $0[column] }
-                    present.append(.repeated(values))
+                /// Опционал-сахар держит 0 или 1 виток — одно значение или его отсутствие
+                /// Повторение собирает массив значений по виткам столбец за столбцом
+                switch repetition.kind {
+                case .optional:
+                    for column in 0..<repetition.arity {
+                        /// Заполненный опционал — один виток, пустой — ноль витков
+                        let value = repetition.items.first.map { $0[column] }
+                        present.append(.optional(value))
+                    }
+                    
+                case .repeatOneOrMore, .repeatZeroOrMore:
+                    /// Символ на позиции column внутри витка дает значения по всем виткам
+                    for column in 0..<repetition.arity {
+                        let values = repetition.items.map { $0[column] }
+                        present.append(.repeated(values))
+                    }
                 }
             }
         }
@@ -151,6 +192,10 @@ public final class Evaluator {
             case .repeated(let children):
                 for child in children { try descend(child) }
                 
+            case .optional(let child):
+                /// Опционал спускается, только если он заполнен
+                if let child { try descend(child) }
+                
             case .absent:
                 continue
             }
@@ -184,11 +229,71 @@ public final class Evaluator {
             )
             
             computing.insert(key)
+            
+            /// Помечаем цель для графа зависимостей, если индекс задан
+            let graphTarget = graphNode(for: reference, node: node, slots: slots)
+            
+            if let graphTarget {
+                graphNodes.insert(graphTarget)
+                targetStack.append(graphTarget)
+            }
+            
             let computed = try evaluate(value, node: node, slots: slots)
+            
+            if graphTarget != nil { targetStack.removeLast() }
+            
             computing.remove(key)
             
             try assign(computed, to: reference, node: node, slots: slots)
         }
+    }
+    
+    /// Узел графа, представляющий цель присваивания — текущий узел для `$0`, ребенок для `$N`
+    private func graphNode(
+        for reference: Reference,
+        node: ParseTree,
+        slots: [Slot]
+    ) -> DependencyGraph.AttributeNode? {
+        /// Без индекса имен графа граф не строится — пропускаем
+        guard let nodeIndex else { return nil }
+        
+        /// Цель — левая часть: синтезированный атрибут текущего нетерминала
+        if reference.target == 0 {
+            return DependencyGraph.AttributeNode(
+                owner: nodeIndex.graphName(of: node),
+                attribute: reference.attribute,
+                kind: .synthesized
+            )
+        }
+        
+        /// Цель — наследуемый атрибут конкретного ребенка, токену писать нельзя
+        let index = Int(reference.target) - 1
+        
+        guard index >= 0, index < slots.count else { return nil }
+        
+        let subtree: ParseTree?
+        
+        switch slots[index] {
+        case .single(let child):
+            if case .tree(let tree) = child { subtree = tree }
+            else { subtree = nil }
+            
+        case .optional(let child):
+            /// Заполненный опционал — узел графа для его поддерева
+            if let child, case .tree(let tree) = child { subtree = tree }
+            else { subtree = nil }
+            
+        case .repeated, .absent:
+            subtree = nil
+        }
+        
+        guard let subtree else { return nil }
+        
+        return DependencyGraph.AttributeNode(
+            owner: nodeIndex.graphName(of: subtree),
+            attribute: reference.attribute,
+            kind: .inherited
+        )
     }
     
     /// Идентичность узла-владельца атрибута: текущий узел для `$0`, ребенок для `$N`
@@ -202,11 +307,24 @@ public final class Evaluator {
         /// Для наследуемого атрибута ребенка — его идентичность, иначе текущий узел
         let index = Int(reference.target) - 1
         
-        if index >= 0, index < slots.count,
-           case .single(let child) = slots[index],
-           case .tree(let subtree) = child
-        {
-            return ObjectIdentifier(subtree)
+        guard index >= 0, index < slots.count else {
+            return ObjectIdentifier(node)
+        }
+        
+        switch slots[index] {
+        case .single(let child):
+            if case .tree(let subtree) = child {
+                return ObjectIdentifier(subtree)
+            }
+            
+        case .optional(let child):
+            /// Заполненный опционал держит один ребенок — берем его идентичность
+            if let child, case .tree(let subtree) = child {
+                return ObjectIdentifier(subtree)
+            }
+            
+        case .repeated, .absent:
+            break
         }
         
         return ObjectIdentifier(node)
@@ -224,18 +342,35 @@ public final class Evaluator {
             let identity = ObjectIdentifier(node)
             synthesized[identity, default: [:]][reference.attribute] = value
             
-        /// Присваивание в правую часть — наследуемый атрибут конкретного ребенка
-        } else {
-            let slot = try resolveSlot(reference.target, in: slots, nonterm: node.symbol)
-            
-            /// Записывать наследуемый атрибут можно только обычному нетерминалу-ребенку
-            guard case .single(let child) = slot,
-                  case .tree(let subtree) = child
-            else { return }
-            
-            let identity = ObjectIdentifier(subtree)
-            inherited[identity, default: [:]][reference.attribute] = value
+            return
         }
+        
+        /// Присваивание в правую часть — наследуемый атрибут конкретного ребенка
+        let slot = try resolveSlot(reference.target, in: slots, nonterm: node.symbol)
+        
+        /// Запись в обычного нетерминала-ребенка либо в заполненный опционал
+        let subtree: ParseTree?
+        
+        switch slot {
+        case .single(let child):
+            /// Прямой ребенок-нетерминал — токену и повторению записать нельзя
+            if case .tree(let tree) = child { subtree = tree }
+            else { subtree = nil }
+            
+        case .optional(let child):
+            /// Заполненный опционал — есть один ребенок, в него можно записать
+            if let child, case .tree(let tree) = child { subtree = tree }
+            else { subtree = nil }
+            
+        case .repeated, .absent:
+            /// Массив по виткам или выпавший символ — наследуемый писать некуда
+            subtree = nil
+        }
+        
+        guard let subtree else { return }
+        
+        let identity = ObjectIdentifier(subtree)
+        inherited[identity, default: [:]][reference.attribute] = value
     }
     
     /// Вычисляет выражение в значение атрибута
@@ -298,12 +433,34 @@ public final class Evaluator {
             if let value = synthesized[identity]
                 .flatMap({ $0[reference.attribute] })
             {
+                /// Источник для графа — собственный синтезированный атрибут
+                if let nodeIndex {
+                    let attributeNode = DependencyGraph.AttributeNode(
+                        owner: nodeIndex.graphName(of: node),
+                        attribute: reference.attribute,
+                        kind: .synthesized
+                    )
+                    
+                    recordEdge(from: attributeNode)
+                }
+                
                 return value
             }
             
             if let value = inherited[identity]
                 .flatMap({ $0[reference.attribute] })
             {
+                /// Источник для графа — собственный наследуемый атрибут, переданный родителем
+                if let nodeIndex {
+                    let attributeNode = DependencyGraph.AttributeNode(
+                        owner: nodeIndex.graphName(of: node),
+                        attribute: reference.attribute,
+                        kind: .inherited
+                    )
+                    
+                    recordEdge(from: attributeNode)
+                }
+                
                 return value
             }
             
@@ -357,6 +514,19 @@ public final class Evaluator {
             
             return .array(values)
             
+        case .optional(let child):
+            /// Символ внутри опционала — значение или пустота
+            guard let child else { return .optional(nil) }
+            
+            let inner = try value(
+                of: child,
+                attribute: reference.attribute,
+                nonterm: node.symbol,
+                target: reference.target
+            )
+            
+            return .optional(inner)
+            
         case .absent:
             /// Выпавший обычный символ не имеет значения
             return .undefined
@@ -372,6 +542,17 @@ public final class Evaluator {
     ) throws -> AttributeValue {
         switch child {
         case .token(let lexeme):
+            /// Источник для графа — встроенный атрибут текста этого токена
+            if let nodeIndex {
+                let attributeNode = DependencyGraph.AttributeNode(
+                    owner: nodeIndex.graphName(of: lexeme),
+                    attribute: "text",
+                    kind: .token
+                )
+                
+                recordEdge(from: attributeNode)
+            }
+            
             /// У токена единственный атрибут — его текст
             return .string(lexeme.text)
             
@@ -393,6 +574,17 @@ public final class Evaluator {
                     attribute: attribute,
                     nonterm: nonterm
                 )
+            }
+            
+            /// Источник для графа — синтезированный атрибут ребенка
+            if let nodeIndex {
+                let attributeNode = DependencyGraph.AttributeNode(
+                    owner: nodeIndex.graphName(of: subtree),
+                    attribute: attribute,
+                    kind: .synthesized
+                )
+                
+                recordEdge(from: attributeNode)
             }
             
             return value
@@ -529,6 +721,16 @@ public final class Evaluator {
         }
     }
     
+    /// Регистрирует ребро в графе
+    private func recordEdge(from source: DependencyGraph.AttributeNode) {
+        guard let target = targetStack.last else { return }
+        
+        graphNodes.insert(source)
+        
+        let edge = DependencyGraph.Edge(from: source, to: target)
+        graphEdges.insert(edge)
+    }
+    
     /// Возвращает слот символа по номеру или бросает ошибку выхода за границы
     private func resolveSlot(
         _ target: UInt,
@@ -564,6 +766,9 @@ private extension Evaluator {
         
         /// Символ внутри повторения — значения по виткам
         case repeated([ParseTree.Child])
+        
+        /// Символ внутри опционала — одно значение или его отсутствие
+        case optional(ParseTree.Child?)
         
         /// Символ выпал при устранении ε и не является сахаром
         case absent

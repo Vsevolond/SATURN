@@ -24,7 +24,10 @@ public struct EpsilonEliminator {
     // MARK: - Public Methods
     
     /// Устраняет ε-правила грамматики
-    public func eliminate(_ grammar: ExpandedGrammar, map: ExpansionMap = [:]) throws -> EpsilonFreeGrammar {
+    public func eliminate(
+        _ grammar: ExpandedGrammar,
+        map: ExpansionMap = [:]
+    ) throws -> EpsilonFreeGrammar {
         let nullable = try nullableSet(grammar)
         
         /// Свежий нетерминал-двойник на каждый исходный

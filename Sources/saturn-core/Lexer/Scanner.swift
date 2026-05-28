@@ -27,7 +27,7 @@ public struct Scanner {
     // MARK: - Public Methods
     
     /// Разбивает входной текст на последовательность лексем
-    public func scan(_ text: String) throws -> [Lexeme] {
+    public func scan(_ text: String) throws(LexicalError) -> [Lexeme] {
         let characters = Array(text)
         var lexemes: [Lexeme] = []
         

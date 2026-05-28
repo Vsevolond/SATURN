@@ -145,3 +145,45 @@ extension AttributeValue {
         }
     }
 }
+
+// MARK: - Extensions
+
+extension AttributeValue: CustomStringConvertible {
+    
+    // MARK: - Public Properties
+    
+    /// Человекочитаемое представление значения атрибута для вывода в консоль
+    public var description: String {
+        switch self {
+        case .int(let value):
+            return String(value)
+            
+        case .float(let value):
+            return String(value)
+            
+        case .string(let value):
+            /// Строка в кавычках
+            return "\"\(value)\""
+            
+        case .bool(let value):
+            return String(value)
+            
+        case .array(let values):
+            /// Массив через запятую в квадратных скобках
+            let parts = values.map { $0.description }.joined(separator: ", ")
+            return "[\(parts)]"
+            
+        case .optional(let wrapped):
+            /// Пустой опционал — `null`, заполненный — содержимое без обертки
+            guard let wrapped else { return "null" }
+            return wrapped.description
+            
+        case .object(let value):
+            /// Пользовательский тип выводится средствами движка через свой `toString`
+            return value.toString() ?? "object"
+            
+        case .undefined:
+            return "undefined"
+        }
+    }
+}
