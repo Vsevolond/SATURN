@@ -761,7 +761,7 @@ struct ValidationTests {
         )
     }
 
-    /// `%rep [ ]` дает `optional<array<...>>`: чтение под повторением-с-опционалом
+    /// `%rep [ ]` дает `array<...>`: пустое повторение — пустой массив, без обертки optional
     @Test func testRepeatOptionalArray() {
         let spec = """
         %tokens
@@ -780,7 +780,7 @@ struct ValidationTests {
         
         assert(
             errors,
-            contains: .assignmentTypeMismatch(target: 0, attribute: "v", expected: "int", given: "optional<array<int>>", nonterm: "s")
+            contains: .assignmentTypeMismatch(target: 0, attribute: "v", expected: "int", given: "array<int>", nonterm: "s")
         )
     }
 

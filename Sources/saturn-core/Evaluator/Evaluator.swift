@@ -264,6 +264,7 @@ public final class Evaluator {
     /// `$0.attr` — атрибут левой части:
     /// - синтезированный — пишется в `synthesized`
     /// - наследуемый — пишется в `inherited` (только для аксиомы)
+    /// - `$0.attr[i]...[k]` — запись в элемент массива-атрибута левой части
     /// `$N.attr` (N > 0) — наследуемый атрибут ребенка:
     /// - под `%rep` без индекса — раздается во все витки
     /// - `$N.attr[i]...[k]` — выбирает конкретный виток (многомерно), с проверкой существования
@@ -282,6 +283,7 @@ public final class Evaluator {
     }
     
     /// Присваивание в левую часть `$0`: синтезированный — в `synthesized`, наследуемый — в `inherited`
+    /// Индексы `$0.attr[i]` адресуют элемент массива-атрибута (оберток повторения у `$0` нет)
     private func assignLeft(
         reference: Reference,
         value: Expression,
@@ -318,12 +320,100 @@ public final class Evaluator {
         computing.remove(key)
         
         /// Синтезированный пишем в synthesized, наследуемый — в inherited
+        /// Индексное присваивание правит элемент массива, без индексов — пишем целиком
         if isInherited {
-            inherited[identity, default: [:]][reference.attribute] = computed
+            let current = inherited[identity]?[reference.attribute]
+            
+            inherited[identity, default: [:]][reference.attribute] = try storeIndexed(
+                computed,
+                into: current,
+                reference: reference,
+                node: node,
+                slots: slots
+            )
             
         } else {
-            synthesized[identity, default: [:]][reference.attribute] = computed
+            let current = synthesized[identity]?[reference.attribute]
+            
+            synthesized[identity, default: [:]][reference.attribute] = try storeIndexed(
+                computed,
+                into: current,
+                reference: reference,
+                node: node,
+                slots: slots
+            )
         }
+    }
+    
+    /// Возвращает новое значение атрибута с учетом индексов присваивания
+    ///
+    /// Без индексов — это само вычисленное значение (запись целиком)
+    /// С индексами `attr[i]...[k]` — берется текущее значение-массив, по индексам
+    /// выбирается элемент, на последнем уровне он заменяется на `value`, массивы
+    /// на пути пересобираются. Массив-атрибут должен быть инициализирован ранее
+    private func storeIndexed(
+        _ value: AttributeValue,
+        into current: AttributeValue?,
+        reference: Reference,
+        node: ParseTree,
+        slots: [Slot]
+    ) throws -> AttributeValue {
+        /// Без индексов — запись целиком
+        guard !reference.subscripts.isEmpty else { return value }
+        
+        /// Вычисляем индексы в целые числа
+        let indices = try reference.subscripts.map { expression -> Int in
+            let index = try evaluate(expression, node: node, slots: slots)
+            
+            guard case .int(let position) = index else {
+                /// Индекс не целочислен — несоответствие отлавливается валидатором
+                throw EvaluateError.undefinedInExpression(nonterm: node.symbol)
+            }
+            
+            return position
+        }
+        
+        /// Текущее значение атрибута: для индексной записи оно должно существовать как массив
+        let base = current ?? .undefined
+        
+        return try replace(in: base, indices: indices[...], with: value, reference: reference)
+    }
+    
+    /// Рекурсивно заменяет элемент массива по цепочке индексов, пересобирая массивы
+    private func replace(
+        in current: AttributeValue,
+        indices: ArraySlice<Int>,
+        with value: AttributeValue,
+        reference: Reference
+    ) throws -> AttributeValue {
+        /// Индексы кончились — это и есть место записи
+        guard let index = indices.first else { return value }
+        
+        /// На пути обязан быть массив
+        guard case .array(var elements) = current else {
+            throw EvaluateError.subscriptOutOfBounds(
+                target: reference.target,
+                attribute: reference.attribute
+            )
+        }
+        
+        /// Индекс в границах
+        guard index >= 0 && index < elements.count else {
+            throw EvaluateError.subscriptOutOfBounds(
+                target: reference.target,
+                attribute: reference.attribute
+            )
+        }
+        
+        /// Спускаемся глубже и пересобираем массив с замененным элементом
+        elements[index] = try replace(
+            in: elements[index],
+            indices: indices.dropFirst(),
+            with: value,
+            reference: reference
+        )
+        
+        return .array(elements)
     }
     
     /// Присваивание в правую часть `$N`: наследуемый атрибут одного или нескольких витков

@@ -13,8 +13,8 @@ extension Specification {
     
     /// Вид обертки группировки
     enum Wrapper {
-        case array /// repeat(...)
-        case optional /// optional[...] или хвост repeat[...]
+        case array /// repeat(...) или repeat[...]
+        case optional /// optional[...]
     }
 
     /// Символ альтернативы в плоской нумерации
@@ -62,12 +62,9 @@ extension Specification {
                 let symbol = FlatSymbol(name: nonterm.name, wrappers: wrappers, isToken: false)
                 result.append(symbol)
                 
-            case let .repeat(nested, optional):
-                /// repeat(...) -> array, repeat[...] -> optional + array
-                var inner: [Wrapper] = [.array]
-                if optional { inner = inner + [.optional] }
-                
-                result += flatten(nested, wrappers: inner + wrappers)
+            case let .repeat(nested, _):
+                /// Обе формы повторения дают массив по виткам
+                result += flatten(nested, wrappers: [.array] + wrappers)
                 
             case .optional(let nested):
                 /// optional — внешняя относительно nested,

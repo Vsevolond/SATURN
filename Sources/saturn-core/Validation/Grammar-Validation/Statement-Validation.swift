@@ -204,22 +204,45 @@ extension Specification {
                 errors.append(error)
             }
             
-            /// Тип цели: объявленный, со снятием subscripts, Бе оберток группировок
-            let unfold = unfoldSubscripts(
-                reference,
-                baseType: attribute.property.type,
-                in: context
-            )
+            /// Индексы при ЗАПИСИ выбирают ВИТКИ повторения, а не элементы массива-атрибута
+            let arrayLevels = symbol.wrappers.reduce(0) { count, wrapper in
+                if case .array = wrapper { return count + 1 }
+                return count
+            }
             
-            errors += unfold.errors
+            /// Индексов не больше, чем уровней повторения у символа
+            if reference.subscripts.count > arrayLevels {
+                errors.append(
+                    ValidationError.subscriptOnNonArray(
+                        target: reference.target,
+                        attribute: reference.attribute,
+                        nonterm: context.nonterm.name
+                    )
+                )
+            }
             
-            guard let type = unfold.type else { return errors }
+            /// Каждый индекс-виток — целое число
+            for index in reference.subscripts {
+                let result = inferType(index, in: context)
+                errors += result.errors
+                
+                if result.type != .int {
+                    errors.append(
+                        ValidationError.subscriptIndexNotInt(
+                            target: reference.target,
+                            attribute: reference.attribute,
+                            nonterm: context.nonterm.name
+                        )
+                    )
+                }
+            }
             
-            /// Совместимость типов при присваивании
+            /// Каждый виток-получатель принимает один экземпляр атрибута,
+            /// поэтому значение сверяется с базовым типом, без оберток повторения
             errors += validateAssignmentValue(
                 reference: reference,
                 value: value,
-                targetType: type,
+                targetType: attribute.property.type,
                 in: context
             )
             

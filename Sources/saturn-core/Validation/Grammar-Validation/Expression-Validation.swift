@@ -157,35 +157,29 @@ extension Specification {
         }
     }
     
-    /// Тип при ЧТЕНИИ: снятие subscript + наложение оберток группировок
+    /// Тип при ЧТЕНИИ: наложение оберток группировок, затем снятие subscript
     private func referenceType(
         _ reference: Reference,
         wrappers: [Wrapper],
         baseType: Property.Kind,
         in context: Context
     ) -> (type: Property.Kind?, errors: [ValidationError]) {
-        /// Снимаем subscripts, чтобы получить базовый тип
-        let unfold = unfoldSubscripts(
-            reference,
-            baseType: baseType,
-            in: context
-        )
-        
-        guard var type = unfold.type else { return (nil, unfold.errors) }
-        
         /// Обертки изнутри наружу
+        var wrapped = baseType
+        
         for wrapper in wrappers {
             switch wrapper {
             case .array:
-                type = .array(type)
+                wrapped = .array(wrapped)
                 
             case .optional:
                 /// optional(optional(x)) → optional(x)
-                if !type.isOptional { type = .optional(type) }
+                if !wrapped.isOptional { wrapped = .optional(wrapped) }
             }
         }
         
-        return (type, unfold.errors)
+        /// Снимаем subscripts с уже обернутого типа
+        return unfoldSubscripts(reference, baseType: wrapped, in: context)
     }
     
     /// Тип результата бинарной операции
