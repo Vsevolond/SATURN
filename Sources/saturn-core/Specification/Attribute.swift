@@ -10,7 +10,7 @@ public struct Attribute {
     
     // MARK: - Type Entities
     
-    public enum Kind {
+    public enum Kind: Equatable {
         
         // MARK: - Cases
         

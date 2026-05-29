@@ -57,18 +57,10 @@ public struct TreeBuilder {
         /// Дети в порядке правой части правила
         var children: [ParseTree.Child] = []
         
-        for child in family.children {
-            /// Служебный нетерминал развертки не идет в дерево узлом — его раскручивает родитель
-            if let site = support(of: child) {
-                /// Гребенка повторения схлопывается в один узел-контейнер на месте символа
-                let repetition = try collapse(child, site: site)
-                children.append(.repetition(repetition))
-                
-            } else {
-                /// Обычный символ — терминал-лист или вложенное поддерево
-                let parsed = try makeChild(child)
-                children.append(parsed)
-            }
+        for element in family.children {
+            /// Служебный сахар схлопывается, обычный символ становится листом или поддеревом
+            let child = try child(from: element)
+            children.append(child)
         }
         
         /// Левая часть продукции — пользовательский нетерминал этого узла
@@ -88,6 +80,21 @@ public struct TreeBuilder {
             start: node.start,
             end: node.end
         )
+    }
+    
+    /// Превращает узел леса в ребенка дерева
+    ///
+    /// Служебный нетерминал развертки схлопывается в `Repetition` (в том числе вложенный)
+    /// Обычный символ становится листом-токеном или вложенным поддеревом
+    private func child(from node: SPPForest.Node) throws -> ParseTree.Child {
+        /// Служебный нетерминал — схлопываем его гребенку в узел-повторение
+        if let site = support(of: node) {
+            let repetition = try collapse(node, site: site)
+            return .repetition(repetition)
+        }
+        
+        /// Обычный символ — терминал-лист или вложенное поддерево
+        return try makeChild(node)
     }
     
     /// Вставляет пустые узлы-повторения на места выпавшего при устранении ε сахара
@@ -148,7 +155,7 @@ public struct TreeBuilder {
         /// Терминальный узел несет лексему — это лист
         if let lexeme = node.lexeme { return .token(lexeme) }
         
-        /// Служебный сюда попасть не должен: его перехватывает вызывающий до makeChild
+        /// Служебный сюда попасть не должен: его перехватывает child(from:) до makeChild
         if support(of: node) != nil {
             let name = name(of: node.symbol)
             throw TreeBuildError.unexpectedSupport(name: name)
@@ -198,7 +205,8 @@ public struct TreeBuilder {
             if body.isEmpty { break }
             
             /// Оставшееся тело без хвоста — одно вхождение повторения
-            let group = try body.map { try makeChild($0) }
+            /// Вложенный сахар внутри тела схлопывается рекурсивно
+            let group = try body.map { try child(from: $0) }
             items.append(group)
             
             current = tail
