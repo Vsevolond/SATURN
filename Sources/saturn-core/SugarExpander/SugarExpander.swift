@@ -142,44 +142,65 @@ private extension SugarExpander {
         // MARK: - Private Methods
         
         /// Порождает служебный нетерминал для `%rep`
-        /// - `%rep(X)` : `A → X | X A`
-        /// - `%rep[X]` : `A → ε | X A`
+        /// - `%rep(X)` : один-и-более, `A → X | X A`
+        /// - `%rep[X]` : ноль-и-более как обертка над один-и-более:
+        ///       A → ε | B   (A — ноль-или-один блок повторения)
+        ///       B → X | X B (B — один-и-более, как %rep(X))
+        ///   Нерекурсивная база B = X делает раскрутку однозначной и не путает
+        ///   пустой виток непустого повторения с базой, даже если X обнуляем
         private func makeRepeat(
             _ productions: [Production],
             optional: Bool,
             parent: String
         ) -> Production {
-            /// Создаем служебный нетерминал
+            /// Вложенный сахар внутри повторения разворачивается рекурсивно
+            let nested = productions.map { expand($0, parent: parent) }
+            
+            /// Один-и-более: рекурсивная гребенка B → X | X B
+            let oneOrMore = makeOneOrMore(nested, parent: parent)
+            
+            /// %rep(X) — это и есть один-и-более
+            guard optional else { return oneOrMore }
+            
+            /// %rep[X] — обертка ноль-или-один над гребенкой: A → ε | B
+            let id = counter.next()
+            let name = "\(parent)_rep_zero_\(id)"
+            
+            let wrapper = Nonterm(name: name)
+            produced.append(wrapper)
+            
+            wrapper.add([
+                Alternative(),                       // ноль витков
+                Alternative(elements: [oneOrMore])   // один-и-более через B
+            ])
+            
+            /// Обертка несет тип ноль-и-более и арность 1: ее единственный
+            /// «символ» — это вложенная гребенка один-и-более
+            map[name] = SugarSite(type: .repeatZeroOrMore, arity: 1, isZeroWrapper: true)
+            
+            return .nonterm(wrapper)
+        }
+        
+        /// Порождает гребенку повторения один-и-более: `B → X | X B`
+        /// nested — уже развернутая группа X
+        private func makeOneOrMore(
+            _ nested: [Production],
+            parent: String
+        ) -> Production {
             let id = counter.next()
             let name = "\(parent)_rep_\(id)"
             
             let support = Nonterm(name: name)
             produced.append(support)
             
-            /// Вложенный сахар внутри повторения разворачивается рекурсивно
-            let nested = productions.map { expand($0, parent: name) }
             let recursive = nested + [.nonterm(support)]
             
-            /// `A → ε | X A`
-            if optional {
-                support.add([
-                    Alternative(),
-                    Alternative(elements: recursive)
-                ])
-                
-            /// `A → X | X A`
-            } else {
-                support.add([
-                    Alternative(elements: nested),
-                    Alternative(elements: recursive)
-                ])
-            }
+            support.add([
+                Alternative(elements: nested), // база: одно вхождение X
+                Alternative(elements: recursive) // X B
+            ])
             
-            /// Устанавливаем описание для служебного нетерминала
-            map[name] = SugarSite(
-                type: optional ? .repeatZeroOrMore : .repeatOneOrMore,
-                arity: nested.count
-            )
+            map[name] = SugarSite(type: .repeatOneOrMore, arity: nested.count)
             
             return .nonterm(support)
         }

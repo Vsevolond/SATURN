@@ -50,7 +50,9 @@ struct SugarExpanderTests {
         #expect(result.map["S_rep_0"] == SugarSite(type: .repeatOneOrMore, arity: 1))
     }
     
-    /// `%rep[B]` разворачивается в правила `repeatzeroOrMore`: `S → ε | B S`
+    /// `%rep[B]` разворачивается в обертку ноль-или-один над гребенкой один-и-более:
+    /// S → ε | S_rep_0 (обертка ноль-и-более, isZeroWrapper)
+    /// S_rep_0 → B | B S_rep_0   (гребенка один-и-более)
     @Test func testRepeatZeroOrMore() {
         let s = Nonterm(name: "S")
         let alt = Alternative(
@@ -66,9 +68,73 @@ struct SugarExpanderTests {
         let result = SugarExpander().expand(axiom: s)
         let rules = ruleSet(result.grammar)
         
-        #expect(rules["S"] == ["S_rep_0"])
-        #expect(rules["S_rep_0"] == ["ε", "B S_rep_0"])
-        #expect(result.map["S_rep_0"] == SugarSite(type: .repeatZeroOrMore, arity: 1))
+        #expect(rules["S"] == ["S_rep_zero_1"])
+        #expect(rules["S_rep_zero_1"] == ["ε", "S_rep_0"])
+        
+        #expect(rules["S_rep_0"] == ["B", "B S_rep_0"])
+        #expect(rules["S_rep_0"]?.contains("ε") == false)
+        
+        #expect(
+            result.map["S_rep_zero_1"] == SugarSite(
+                type: .repeatZeroOrMore,
+                arity: 1,
+                isZeroWrapper: true
+            )
+        )
+        
+        #expect(
+            result.map["S_rep_0"] == SugarSite(
+                type: .repeatOneOrMore,
+                arity: 1
+            )
+        )
+    }
+    
+    /// `%rep[ [B] ]` — обертка ноль-или-один над гребенкой, чья группа — опционал
+    @Test func testRepeatZeroOfOptional() {
+        let s = Nonterm(name: "S")
+        let alt = Alternative(
+            elements: [
+                .repeat(
+                    productions: [
+                        .optional(productions: [.term("B")])
+                    ],
+                    optional: true
+                )
+            ]
+        )
+        s.add(alt)
+        
+        let result = SugarExpander().expand(axiom: s)
+        let rules = ruleSet(result.grammar)
+        
+        #expect(rules["S"] == ["S_rep_zero_2"])
+        #expect(rules["S_rep_zero_2"] == ["ε", "S_rep_1"])
+        
+        #expect(rules["S_rep_1"] == ["S_opt_0", "S_opt_0 S_rep_1"])
+        #expect(rules["S_rep_1"]?.contains("ε") == false)
+        
+        #expect(rules["S_opt_0"] == ["B", "ε"])
+        
+        #expect(
+            result.map["S_rep_zero_2"] == SugarSite(
+                type: .repeatZeroOrMore,
+                arity: 1,
+                isZeroWrapper: true
+            )
+        )
+        #expect(
+            result.map["S_rep_1"] == SugarSite(
+                type: .repeatOneOrMore,
+                arity: 1
+            )
+        )
+        #expect(
+            result.map["S_opt_0"] == SugarSite(
+                type: .optional,
+                arity: 1
+            )
+        )
     }
     
     /// `[B]` разворачивается в пару альтернатив: `S → B | ε`

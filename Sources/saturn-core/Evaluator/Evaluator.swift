@@ -74,7 +74,11 @@ public final class Evaluator {
     /// Вычисляет атрибуты дерева и возвращает синтезированные атрибуты корня
     public func evaluate(_ tree: ParseTree) throws -> [String: AttributeValue] {
         try visit(tree)
-        let identity = ObjectIdentifier(tree)
+        
+        /// Если корень — служебная обертка обнуляемой аксиомы (_Start → S),
+        /// атрибуты пользовательской аксиомы лежат на ее единственном ребенке
+        let target = axiom(of: tree)
+        let identity = ObjectIdentifier(target)
         
         return synthesized[identity] ?? [:]
     }
@@ -83,7 +87,8 @@ public final class Evaluator {
     public func evaluateAll(_ tree: ParseTree) throws -> EvaluateResult {
         try visit(tree)
         
-        let identity = ObjectIdentifier(tree)
+        let target = axiom(of: tree)
+        let identity = ObjectIdentifier(target)
         let graph = DependencyGraph(nodes: graphNodes, edges: graphEdges)
         
         return EvaluateResult(
@@ -95,6 +100,18 @@ public final class Evaluator {
     }
     
     // MARK: - Private Methods
+    
+    /// Возвращает пользовательскую аксиому: сам корень либо его единственный
+    /// ребенок-поддерево, если корень — служебная обертка обнуляемой аксиомы
+    private func axiom(of tree: ParseTree) -> ParseTree {
+        /// Обертка не объявлена в спецификации и имеет ровно одного ребенка-поддерево
+        guard specification.attributes[tree.symbol] == nil,
+              tree.children.count == 1,
+              case .tree(let inner) = tree.children[0]
+        else { return tree }
+        
+        return inner
+    }
     
     /// Выполняет действия правила узла, спускаясь в детей по мере чтения их атрибутов
     private func visit(_ node: ParseTree) throws {
@@ -188,17 +205,22 @@ public final class Evaluator {
         
         for column in 0..<repetition.arity {
             /// Разворачиваем символ этого столбца отдельно для каждого витка
+            /// Если виток короче — это пустая позиция столбца (выпавший сахар)
             let perIteration: [[Slot]] = repetition.items.map { body in
-                expandChild(body[column])
+                guard column < body.count else { return [] }
+                
+                return expandChild(body[column])
             }
             
             /// Число плоских позиций столбца одинаково на всех витках
             /// Пустое повторение вложенную форму не хранит — берем одну позицию на столбец
-            let flatCount = perIteration.first?.count ?? 1
+            let flatCount = perIteration.map(\.count).max() ?? 1
             
             for position in 0..<flatCount {
                 /// Значение этой позиции по всем виткам
-                let cells: [Slot] = perIteration.map { $0[position] }
+                let cells: [Slot] = perIteration.map { sub in
+                    position < sub.count ? sub[position] : .absent
+                }
                 
                 switch repetition.kind {
                 case .optional:

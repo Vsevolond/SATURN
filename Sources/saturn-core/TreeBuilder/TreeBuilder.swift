@@ -54,11 +54,10 @@ public struct TreeBuilder {
             )
         }
         
-        /// Дети в порядке правой части правила
+        /// Дети в порядке правой части правила, вложенный сахар разворачивается рекурсивно
         var children: [ParseTree.Child] = []
         
         for element in family.children {
-            /// Служебный сахар схлопывается, обычный символ становится листом или поддеревом
             let child = try child(from: element)
             children.append(child)
         }
@@ -84,8 +83,12 @@ public struct TreeBuilder {
     
     /// Превращает узел леса в ребенка дерева
     ///
-    /// Служебный нетерминал развертки схлопывается в `Repetition` (в том числе вложенный)
-    /// Обычный символ становится листом-токеном или вложенным поддеревом
+    /// Единая точка для детей обычного узла и для тела витка повторения:
+    /// - служебный нетерминал развертки схлопывается в `Repetition` (в том числе вложенный)
+    /// - терминал становится листом-токеном
+    /// - обычный нетерминал — вложенным поддеревом
+    /// Рекурсия через collapse → child(from:) обрабатывает вложенный сахар любой глубины:
+    /// повторение в повторении, опционал в повторении, повторение в опционале, опционал в опционале
     private func child(from node: SPPForest.Node) throws -> ParseTree.Child {
         /// Служебный нетерминал — схлопываем его гребенку в узел-повторение
         if let site = support(of: node) {
@@ -167,9 +170,20 @@ public struct TreeBuilder {
     }
     
     /// Схлопывает правую гребенку служебного нетерминала в один узел-повторение
-    /// Развертка строит повторение праворекурсивно: `A → X | X A` либо `A → ε | X A`,
-    /// Идем по хвостам, на каждом витке снимая ведущие символы как одно вхождение, пока хвост не упрется в базу
+    ///
+    /// Развертка строит повторение праворекурсивно: `%rep(X)` → `A → X | X A`,
+    /// `%rep[X]` → `A → ε | X A`. Идем по хвостам, на каждом витке снимая ведущие
+    /// символы как одно вхождение, пока хвост не упрется в базу:
+    /// - для `%rep(...)` база — нерекурсивная альтернатива `X`
+    /// - для `%rep[...]` база — пустое тело (бывшая ε-альтернатива) → break
+    /// Тело витка может содержать вложенный сахар — он разворачивается тем же
+    /// child(from:), поэтому вложенность работает на любую глубину
     private func collapse(_ node: SPPForest.Node, site: SugarSite) throws -> ParseTree.Repetition {
+        /// Обертка ноль-или-один над гребенкой: раскрываем внутреннюю гребенку,
+        /// ее витки становятся витками этого повторения ноль-и-более
+        guard !site.isZeroWrapper else {
+            return try collapseZeroWrapper(node, site: site)
+        }
         /// Имя гребенки — по нему опознаем рекурсивный хвост среди детей витка
         let supportName = name(of: node.symbol)
         
@@ -195,20 +209,32 @@ public struct TreeBuilder {
             /// Хвост следующего витка, если правило рекурсивно
             var tail: SPPForest.Node? = nil
             
-            /// Последний символ — рекурсивный хвост той же гребенки, отделяем его от тела
-            if let last = body.last, name(of: last.symbol) == supportName {
+            /// Последний символ — рекурсивный хвост ИМЕННО этой гребенки
+            /// Сверяем и имя, и служебность: вложенная гребенка имеет свое имя
+            /// и снимается своим collapse, чужой хвост сюда не попадет
+            if let last = body.last,
+               name(of: last.symbol) == supportName,
+               support(of: last) != nil
+            {
                 tail = last
                 body.removeLast()
             }
             
-            /// Пустое тело — вхождения нет, раскрутка завершена
+            /// Пустое тело — база достигнута, раскрутка завершена.
             if body.isEmpty { break }
             
-            /// Оставшееся тело без хвоста — одно вхождение повторения
-            /// Вложенный сахар внутри тела схлопывается рекурсивно
+            /// Тело витка без хвоста — одно вхождение; вложенный сахар сворачивается рекурсивно
             let group = try body.map { try child(from: $0) }
-            items.append(group)
             
+            /// Восстанавливаем выпавший при устранении ε сахар тела витка,
+            /// чтобы число позиций совпадало с формой группы на всех витках
+            let restored = restore(
+                children: group,
+                production: family.production,
+                end: curr.end
+            )
+            
+            items.append(restored)
             current = tail
         }
         
@@ -217,6 +243,48 @@ public struct TreeBuilder {
             kind: site.type,
             arity: site.arity,
             items: items,
+            start: node.start,
+            end: node.end
+        )
+    }
+    
+    /// Сворачивает обертку `%rep[...]` (ноль-или-один над гребенкой) в плоское повторение ноль-и-более:
+    /// пустая альтернатива — ноль витков, непустая — витки вложенной гребенки, поднятые на этот уровень
+    private func collapseZeroWrapper(
+        _ node: SPPForest.Node,
+        site: SugarSite
+    ) throws -> ParseTree.Repetition {
+        guard let family = node.families.first else {
+            throw TreeBuildError.emptyNode(
+                symbol: name(of: node.symbol),
+                start: node.start,
+                end: node.end
+            )
+        }
+        
+        /// Пустая альтернатива обертки — ноль витков
+        guard let inner = family.children.first else {
+            return ParseTree.Repetition(
+                kind: .repeatZeroOrMore,
+                arity: site.arity,
+                items: [],
+                start: node.start,
+                end: node.end
+            )
+        }
+        
+        /// Непустая альтернатива: единственный символ — вложенная гребенка один-и-более
+        /// Сворачиваем ее и поднимаем ее витки как свои
+        guard let innerSite = support(of: inner) else {
+            throw TreeBuildError.unexpectedSupport(name: name(of: inner.symbol))
+        }
+        
+        let nested = try collapse(inner, site: innerSite)
+        
+        return ParseTree.Repetition(
+            kind: .repeatZeroOrMore,
+            arity: nested.arity,
+            items: nested.items,
             start: node.start,
             end: node.end
         )

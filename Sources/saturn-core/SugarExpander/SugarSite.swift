@@ -17,4 +17,15 @@ public struct SugarSite: Equatable {
     
     /// Число символов в одном вхождении группы
     public let arity: Int
+    
+    /// Обертка ноль-или-один над гребенкой один-и-более (для `%rep[...]`)
+    public let isZeroWrapper: Bool
+    
+    // MARK: - Initializers
+    
+    init(type: SugarType, arity: Int, isZeroWrapper: Bool = false) {
+        self.type = type
+        self.arity = arity
+        self.isZeroWrapper = isZeroWrapper
+    }
 }
