@@ -1,26 +1,39 @@
 // swift-tools-version: 6.2
-// The swift-tools-version declares the minimum version of Swift required to build this package.
 
 import PackageDescription
 
 let package = Package(
     name: "saturn",
+    platforms: [
+        .macOS(.v10_15)
+    ],
     products: [
-        // Products define the executables and libraries a package produces, making them visible to other packages.
-        .library(
-            name: "saturn",
-            targets: ["saturn"]
-        ),
+        .library(name: "saturn-core", targets: ["saturn-core"]),
+        .executable(name: "saturn", targets: ["saturn"])
+    ],
+    dependencies: [
+        .package(url: "https://github.com/apple/swift-argument-parser", from: "1.3.0"),
+        .package(url: "https://github.com/pointfreeco/swift-parsing", from: "0.13.0"),
+        .package(url: "https://github.com/SwiftDocOrg/GraphViz", from: "0.4.1")
     ],
     targets: [
-        // Targets are the basic building blocks of a package, defining a module or a test suite.
-        // Targets can depend on other targets in this package and products from dependencies.
         .target(
-            name: "saturn"
+            name: "saturn-core",
+            dependencies: ["GraphViz"]
         ),
+        
+        .executableTarget(
+            name: "saturn",
+            dependencies: [
+                "saturn-core",
+                .product(name: "ArgumentParser", package: "swift-argument-parser"),
+                .product(name: "Parsing", package: "swift-parsing")
+            ]
+        ),
+        
         .testTarget(
-            name: "saturnTests",
-            dependencies: ["saturn"]
+            name: "saturn-tests",
+            dependencies: ["saturn", "saturn-core"]
         ),
     ]
 )

@@ -1,0 +1,1036 @@
+//
+//  Evaluator.swift
+//  saturn
+//
+//  Created by Vsevolod Donchenko on 27.05.2026.
+//
+
+import Foundation
+import JavaScriptCore
+
+/// Вычислитель атрибутов синтаксически управляемого определения
+/// Обходит дерево разбора и вычисляет атрибуты по семантическим действиям правил
+/// Грамматика L-атрибутная:
+/// - наследуемые атрибуты ребенка готовятся до спуска в него
+/// - синтезированные читаются после.
+/// Действия исполняются в порядке записи
+public final class Evaluator {
+    
+    // MARK: - Private Properties
+    
+    /// Спецификация: объявления атрибутов, методов, типов
+    private let specification: Specification
+    
+    /// Занумерованные продукции — по номеру правила доступны действия и выпавшие символы
+    private let productions: [NumberedProduction]
+    
+    /// Среда выполнения пользовательской логики
+    private let runtime: SemanticRuntime
+    
+    /// Синтезированные атрибуты узлов по идентичности
+    private var synthesized: [ObjectIdentifier: [String: AttributeValue]] = [:]
+    
+    /// Наследуемые атрибуты узлов, записанные родителем до спуска
+    private var inherited: [ObjectIdentifier: [String: AttributeValue]] = [:]
+    
+    /// Узлы, для которых спуск уже выполнен
+    private var visited: Set<ObjectIdentifier> = []
+    
+    /// Узлы, спуск в которые сейчас идет — повторный вход означает цикл через спуск
+    private var inProgress: Set<ObjectIdentifier> = []
+    
+    /// Атрибуты в процессе вычисления — повторный запрос означает цикл зависимости
+    private var computing: Set<AttributeKey> = []
+    
+    /// Индекс имен узлов для согласованного именования в графе и сериализации
+    private let nodeIndex: NodeIndex?
+    
+    /// Узлы графа зависимостей атрибутов, накопленные во время обхода
+    private var graphNodes: Set<DependencyGraph.AttributeNode> = []
+    
+    /// Ребра графа зависимостей: значение источника требовалось для вычисления цели
+    private var graphEdges: Set<DependencyGraph.Edge> = []
+    
+    /// Стек целей присваивания — на каждом уровне это все поддеревья-получатели
+    /// При чтении источника ребро проводится к каждой цели верхнего уровня
+    private var targetStack: [[DependencyGraph.AttributeNode]] = []
+    
+    // MARK: - Initializers
+    
+    public init(
+        specification: Specification,
+        productions: [NumberedProduction],
+        runtime: SemanticRuntime,
+        nodeIndex: NodeIndex? = nil
+    ) {
+        self.specification = specification
+        self.productions = productions
+        self.runtime = runtime
+        self.nodeIndex = nodeIndex
+    }
+    
+    // MARK: - Public Methods
+    
+    /// Вычисляет атрибуты дерева и возвращает синтезированные атрибуты корня
+    public func evaluate(_ tree: ParseTree) throws -> [String: AttributeValue] {
+        try visit(tree)
+        
+        /// Если корень — служебная обертка обнуляемой аксиомы (_Start → S),
+        /// атрибуты пользовательской аксиомы лежат на ее единственном ребенке
+        let target = axiom(of: tree)
+        let identity = ObjectIdentifier(target)
+        
+        return synthesized[identity] ?? [:]
+    }
+    
+    /// Вычисляет атрибуты дерева и возвращает полный результат: значения и граф зависимостей
+    public func evaluateAll(_ tree: ParseTree) throws -> EvaluateResult {
+        try visit(tree)
+        
+        let target = axiom(of: tree)
+        let identity = ObjectIdentifier(target)
+        let graph = DependencyGraph(nodes: graphNodes, edges: graphEdges)
+        
+        return EvaluateResult(
+            rootAttributes: synthesized[identity] ?? [:],
+            synthesizedByNode: synthesized,
+            inheritedByNode: inherited,
+            dependencyGraph: graph
+        )
+    }
+    
+    // MARK: - Private Methods
+    
+    /// Возвращает пользовательскую аксиому: сам корень либо его единственный
+    /// ребенок-поддерево, если корень — служебная обертка обнуляемой аксиомы
+    private func axiom(of tree: ParseTree) -> ParseTree {
+        /// Обертка не объявлена в спецификации и имеет ровно одного ребенка-поддерево
+        guard specification.attributes[tree.symbol] == nil,
+              tree.children.count == 1,
+              case .tree(let inner) = tree.children[0]
+        else { return tree }
+        
+        return inner
+    }
+    
+    /// Выполняет действия правила узла, спускаясь в детей по мере чтения их атрибутов
+    private func visit(_ node: ParseTree) throws {
+        let identity = ObjectIdentifier(node)
+        
+        /// Узел уже обработан — повторный спуск не нужен
+        guard !visited.contains(identity) else { return }
+        
+        /// Повторный вход в узел, спуск в который еще идет — цикл через зависимость
+        guard !inProgress.contains(identity) else {
+            throw EvaluateError.cyclicDependency(nonterm: node.symbol)
+        }
+        
+        inProgress.insert(identity)
+        
+        let production = productions[node.production]
+        let slots = buildSlots(node: node, production: production)
+        
+        /// Действия исполняются в порядке записи
+        for statement in production.actions {
+            try execute(statement, node: node, slots: slots)
+        }
+        
+        /// Дети, чьи атрибуты не читались, все равно вычисляются
+        try descendRemaining(slots: slots)
+        
+        inProgress.remove(identity)
+        visited.insert(identity)
+    }
+    
+    /// Строит плоскую нумерацию символов правой части
+    ///
+    /// Скобки групп прозрачны: вложенный сахар разворачивается рекурсивно в плоские
+    /// позиции, каждая позиция несет полную цепочку оберток повторения и опционала
+    private func buildSlots(node: ParseTree, production: NumberedProduction) -> [Slot] {
+        /// Сначала разворачиваем фактических детей в плоские позиции
+        var present: [Slot] = []
+        
+        for child in node.children {
+            let expanded = expandChild(child)
+            present.append(contentsOf: expanded)
+        }
+        
+        /// Без выпавших обычных символов плоский список совпадает с present
+        let ordinaryDropped = production.dropped.filter { !$0.isSugar }
+        
+        guard !ordinaryDropped.isEmpty else { return present }
+        
+        /// Раскладываем present по исходным позициям, оставляя absent на местах выпавших
+        let total = present.count + ordinaryDropped.count
+        var droppedAt: Set<Int> = []
+        
+        for symbol in ordinaryDropped { droppedAt.insert(symbol.position) }
+        
+        var slots: [Slot] = []
+        var next = 0
+        
+        for position in 0..<total {
+            if droppedAt.contains(position) {
+                slots.append(.absent)
+                
+            } else {
+                slots.append(present[next])
+                next += 1
+            }
+        }
+        
+        return slots
+    }
+    
+    /// Разворачивает одного ребенка дерева в плоские позиции
+    /// Обычный символ дает одну позицию, конструкция сахара — по позиции на каждый свой столбец
+    private func expandChild(_ child: ParseTree.Child) -> [Slot] {
+        switch child {
+        case .tree, .token:
+            return [.single(child)]
+            
+        case .repetition(let repetition):
+            return expandRepetition(repetition)
+        }
+    }
+    
+    /// Разворачивает конструкцию сахара в плоские позиции по столбцам
+    ///
+    /// Каждый столбец группы дает позиции, обернутые видом сахара:
+    /// - повторение — подслот на каждый виток
+    /// - опционал — подслот или его отсутствие
+    /// Вложенный столбец-сахар разворачивается рекурсивно
+    private func expandRepetition(_ repetition: ParseTree.Repetition) -> [Slot] {
+        var columns: [Slot] = []
+        
+        for column in 0..<repetition.arity {
+            /// Разворачиваем символ этого столбца отдельно для каждого витка
+            /// Если виток короче — это пустая позиция столбца (выпавший сахар)
+            let perIteration: [[Slot]] = repetition.items.map { body in
+                guard column < body.count else { return [] }
+                
+                return expandChild(body[column])
+            }
+            
+            /// Число плоских позиций столбца одинаково на всех витках
+            /// Пустое повторение вложенную форму не хранит — берем одну позицию на столбец
+            let flatCount = perIteration.map(\.count).max() ?? 1
+            
+            for position in 0..<flatCount {
+                /// Значение этой позиции по всем виткам
+                let cells: [Slot] = perIteration.map { sub in
+                    position < sub.count ? sub[position] : .absent
+                }
+                
+                switch repetition.kind {
+                case .optional:
+                    /// Заполненный опционал — один виток, пустой — ноль витков
+                    columns.append(.optional(cells.first))
+                    
+                case .repeatOneOrMore, .repeatZeroOrMore:
+                    columns.append(.repeated(cells))
+                }
+            }
+        }
+        
+        return columns
+    }
+    
+    /// Спускается во всех детей-поддеревья, еще не посещенных при чтении атрибутов
+    private func descendRemaining(slots: [Slot]) throws {
+        for slot in slots { try descendSlot(slot) }
+    }
+    
+    /// Рекурсивно спускается во все поддеревья слота с учетом оберток сахара
+    private func descendSlot(_ slot: Slot) throws {
+        switch slot {
+        case .single(let child):
+            try descend(child)
+            
+        case .repeated(let subs):
+            for sub in subs { try descendSlot(sub) }
+            
+        case .optional(let inner):
+            /// Опционал спускается, только если он заполнен
+            if let inner { try descendSlot(inner) }
+            
+        case .absent:
+            return
+        }
+    }
+    
+    /// Спускается в ребенка, если это непосещенное поддерево, токен значения не требует
+    private func descend(_ child: ParseTree.Child) throws {
+        guard case .tree(let subtree) = child else { return }
+        try visit(subtree)
+    }
+    
+    /// Исполняет один оператор семантического действия
+    private func execute(
+        _ statement: Statement,
+        node: ParseTree,
+        slots: [Slot]
+    ) throws {
+        switch statement {
+        case .call(let method, let arguments):
+            /// Самостоятельный вызов: результат отбрасывается, важны побочные эффекты
+            _ = try invoke(method: method, arguments: arguments, node: node, slots: slots)
+            
+        case .assignment(let reference, let value):
+            try executeAssignment(reference: reference, value: value, node: node, slots: slots)
+        }
+    }
+    
+    /// Исполняет присваивание: вычисляет значение и записывает его в одну или несколько целей
+    ///
+    /// `$0.attr` — атрибут левой части:
+    /// - синтезированный — пишется в `synthesized`
+    /// - наследуемый — пишется в `inherited` (только для аксиомы)
+    /// - `$0.attr[i]...[k]` — запись в элемент массива-атрибута левой части
+    /// `$N.attr` (N > 0) — наследуемый атрибут ребенка:
+    /// - под `%rep` без индекса — раздается во все витки
+    /// - `$N.attr[i]...[k]` — выбирает конкретный виток (многомерно), с проверкой существования
+    private func executeAssignment(
+        reference: Reference,
+        value: Expression,
+        node: ParseTree,
+        slots: [Slot]
+    ) throws {
+        if reference.target == 0 {
+            try assignLeft(reference: reference, value: value, node: node, slots: slots)
+            return
+        }
+        
+        try assignRight(reference: reference, value: value, node: node, slots: slots)
+    }
+    
+    /// Присваивание в левую часть `$0`: синтезированный — в `synthesized`, наследуемый — в `inherited`
+    /// Индексы `$0.attr[i]` адресуют элемент массива-атрибута (оберток повторения у `$0` нет)
+    private func assignLeft(
+        reference: Reference,
+        value: Expression,
+        node: ParseTree,
+        slots: [Slot]
+    ) throws {
+        let isInherited = isInheritedAttribute(reference.attribute, of: node.symbol)
+        
+        let identity = ObjectIdentifier(node)
+        let key = AttributeKey(node: identity, inherited: isInherited, name: reference.attribute)
+        
+        computing.insert(key)
+        
+        /// Цель для графа — собственный атрибут текущего узла нужного вида
+        var pushed = false
+        
+        if let nodeIndex {
+            let target = DependencyGraph.AttributeNode(
+                owner: nodeIndex.graphName(of: node),
+                attribute: reference.attribute,
+                kind: isInherited ? .inherited : .synthesized
+            )
+            
+            graphNodes.insert(target)
+            targetStack.append([target])
+            
+            pushed = true
+        }
+        
+        let computed = try evaluate(value, node: node, slots: slots)
+        
+        if pushed { targetStack.removeLast() }
+        
+        computing.remove(key)
+        
+        /// Синтезированный пишем в synthesized, наследуемый — в inherited
+        /// Индексное присваивание правит элемент массива, без индексов — пишем целиком
+        if isInherited {
+            let current = inherited[identity]?[reference.attribute]
+            
+            inherited[identity, default: [:]][reference.attribute] = try storeIndexed(
+                computed,
+                into: current,
+                reference: reference,
+                node: node,
+                slots: slots
+            )
+            
+        } else {
+            let current = synthesized[identity]?[reference.attribute]
+            
+            synthesized[identity, default: [:]][reference.attribute] = try storeIndexed(
+                computed,
+                into: current,
+                reference: reference,
+                node: node,
+                slots: slots
+            )
+        }
+    }
+    
+    /// Возвращает новое значение атрибута с учетом индексов присваивания
+    ///
+    /// Без индексов — это само вычисленное значение (запись целиком)
+    /// С индексами `attr[i]...[k]` — берется текущее значение-массив, по индексам
+    /// выбирается элемент, на последнем уровне он заменяется на `value`, массивы
+    /// на пути пересобираются. Массив-атрибут должен быть инициализирован ранее
+    private func storeIndexed(
+        _ value: AttributeValue,
+        into current: AttributeValue?,
+        reference: Reference,
+        node: ParseTree,
+        slots: [Slot]
+    ) throws -> AttributeValue {
+        /// Без индексов — запись целиком
+        guard !reference.subscripts.isEmpty else { return value }
+        
+        /// Вычисляем индексы в целые числа
+        let indices = try reference.subscripts.map { expression -> Int in
+            let index = try evaluate(expression, node: node, slots: slots)
+            
+            guard case .int(let position) = index else {
+                /// Индекс не целочислен — несоответствие отлавливается валидатором
+                throw EvaluateError.undefinedInExpression(nonterm: node.symbol)
+            }
+            
+            return position
+        }
+        
+        /// Текущее значение атрибута: для индексной записи оно должно существовать как массив
+        let base = current ?? .undefined
+        
+        return try replace(in: base, indices: indices[...], with: value, reference: reference)
+    }
+    
+    /// Рекурсивно заменяет элемент массива по цепочке индексов, пересобирая массивы
+    private func replace(
+        in current: AttributeValue,
+        indices: ArraySlice<Int>,
+        with value: AttributeValue,
+        reference: Reference
+    ) throws -> AttributeValue {
+        /// Индексы кончились — это и есть место записи
+        guard let index = indices.first else { return value }
+        
+        /// На пути обязан быть массив
+        guard case .array(var elements) = current else {
+            throw EvaluateError.subscriptOutOfBounds(
+                target: reference.target,
+                attribute: reference.attribute
+            )
+        }
+        
+        /// Индекс в границах
+        guard index >= 0 && index < elements.count else {
+            throw EvaluateError.subscriptOutOfBounds(
+                target: reference.target,
+                attribute: reference.attribute
+            )
+        }
+        
+        /// Спускаемся глубже и пересобираем массив с замененным элементом
+        elements[index] = try replace(
+            in: elements[index],
+            indices: indices.dropFirst(),
+            with: value,
+            reference: reference
+        )
+        
+        return .array(elements)
+    }
+    
+    /// Присваивание в правую часть `$N`: наследуемый атрибут одного или нескольких витков
+    private func assignRight(
+        reference: Reference,
+        value: Expression,
+        node: ParseTree,
+        slots: [Slot]
+    ) throws {
+        /// Поддеревья-получатели: широковещательно по виткам либо выбранный виток по индексу
+        let subtrees = try assignTargets(reference, node: node, slots: slots)
+        
+        /// Страж цикла грубый — на родительском узле: значение вычисляется один раз до раздачи
+        let key = AttributeKey(
+            node: ObjectIdentifier(node),
+            inherited: true,
+            name: reference.attribute
+        )
+        
+        computing.insert(key)
+        
+        /// Цели для графа — наследуемый атрибут каждого поддерева-получателя
+        var pushed = false
+        
+        if let nodeIndex {
+            let targets = subtrees.map { subtree in
+                DependencyGraph.AttributeNode(
+                    owner: nodeIndex.graphName(of: subtree),
+                    attribute: reference.attribute,
+                    kind: .inherited
+                )
+            }
+            
+            if !targets.isEmpty {
+                targets.forEach { graphNodes.insert($0) }
+                targetStack.append(targets)
+                
+                pushed = true
+            }
+        }
+        
+        let computed = try evaluate(value, node: node, slots: slots)
+        
+        if pushed { targetStack.removeLast() }
+        
+        computing.remove(key)
+        
+        /// Одно и то же значение раздается во все витки-получатели
+        for subtree in subtrees {
+            let identity = ObjectIdentifier(subtree)
+            inherited[identity, default: [:]][reference.attribute] = computed
+        }
+    }
+    
+    /// Поддеревья-цели присваивания наследуемого атрибута символу `$N`
+    ///
+    /// Без индекса — широковещательно во все витки повторения (в том числе вложенного)
+    /// С индексами `$N.attr[i]...[k]` — конкретный виток на каждом уровне повторения
+    /// Опционал разыменовывается автоматически
+    private func assignTargets(
+        _ reference: Reference,
+        node: ParseTree,
+        slots: [Slot]
+    ) throws -> [ParseTree] {
+        let slot = try resolveSlot(reference.target, in: slots, nonterm: node.symbol)
+        
+        /// Индексы вычисляются заранее в целые числа
+        let indices = try reference.subscripts.map { expression -> Int in
+            let value = try evaluate(expression, node: node, slots: slots)
+            
+            guard case .int(let index) = value else {
+                /// Индекс не целочислен — несоответствие отлавливается валидатором
+                throw EvaluateError.undefinedInExpression(nonterm: node.symbol)
+            }
+            
+            return index
+        }
+        
+        var result: [ParseTree] = []
+        
+        try collectTargets(
+            slot: slot,
+            indices: indices[...],
+            reference: reference,
+            nonterm: node.symbol,
+            into: &result
+        )
+        
+        return result
+    }
+    
+    /// Обходит слот, собирая поддеревья-цели по индексам витков и оберткам сахара
+    private func collectTargets(
+        slot: Slot,
+        indices: ArraySlice<Int>,
+        reference: Reference,
+        nonterm: String,
+        into result: inout [ParseTree]
+    ) throws {
+        switch slot {
+        case .single(let child):
+            /// Одиночный символ витков не имеет — оставшихся индексов быть не должно
+            guard indices.isEmpty else {
+                throw EvaluateError.subscriptOutOfBounds(
+                    target: reference.target,
+                    attribute: reference.attribute
+                )
+            }
+            
+            /// Записать наследуемый можно только в поддерево-нетерминал, токену нельзя
+            if case .tree(let subtree) = child { result.append(subtree) }
+            
+        case .optional(let inner):
+            /// Опционал разыменовывается автоматически и индекс не потребляет
+            guard let inner else { return }
+            
+            try collectTargets(
+                slot: inner,
+                indices: indices,
+                reference: reference,
+                nonterm: nonterm,
+                into: &result
+            )
+            
+        case .repeated(let subs):
+            if let index = indices.first {
+                /// Индекс выбирает виток — он обязан существовать
+                guard index >= 0 && index < subs.count else {
+                    throw EvaluateError.subscriptOutOfBounds(
+                        target: reference.target,
+                        attribute: reference.attribute
+                    )
+                }
+                
+                try collectTargets(
+                    slot: subs[index],
+                    indices: indices.dropFirst(),
+                    reference: reference,
+                    nonterm: nonterm,
+                    into: &result
+                )
+                
+            } else {
+                /// Без индекса — раздаем значение в каждый виток
+                for sub in subs {
+                    try collectTargets(
+                        slot: sub,
+                        indices: indices,
+                        reference: reference,
+                        nonterm: nonterm,
+                        into: &result
+                    )
+                }
+            }
+            
+        case .absent:
+            return
+        }
+    }
+    
+    /// Вычисляет выражение в значение атрибута
+    private func evaluate(
+        _ expression: Expression,
+        node: ParseTree,
+        slots: [Slot]
+    ) throws -> AttributeValue {
+        switch expression {
+        case .int(let value):
+            return .int(value)
+            
+        case .float(let value):
+            return .float(value)
+            
+        case .string(let value):
+            return .string(value)
+            
+        case .bool(let value):
+            return .bool(value)
+            
+        case .attribute(let reference):
+            return try read(reference, node: node, slots: slots)
+            
+        case .call(let method, let arguments):
+            return try invoke(method: method, arguments: arguments, node: node, slots: slots)
+            
+        case .binary(let left, let operation, let right):
+            let leftValue = try evaluate(left, node: node, slots: slots)
+            let rightValue = try evaluate(right, node: node, slots: slots)
+            
+            return try apply(operation, leftValue, rightValue, nonterm: node.symbol)
+        }
+    }
+    
+    /// Читает значение по ссылке на атрибут с учетом оберток повторения и индексов
+    private func read(
+        _ reference: Reference,
+        node: ParseTree,
+        slots: [Slot]
+    ) throws -> AttributeValue {
+        /// Базовое значение символа без снятия индексов
+        let base = try readBase(reference, node: node, slots: slots)
+        
+        /// Снимаем индексы subscripts: каждый шаг разыменовывает массив
+        return try applySubscripts(reference, to: base, node: node, slots: slots)
+    }
+    
+    /// Базовое значение символа: атрибут левой части, ребенка или массив значений по виткам
+    private func readBase(
+        _ reference: Reference,
+        node: ParseTree,
+        slots: [Slot]
+    ) throws -> AttributeValue {
+        /// Левая часть — свой синтезированный атрибут, либо наследуемый, записанный родителем
+        if reference.target == 0 {
+            let identity = ObjectIdentifier(node)
+            
+            /// Сначала вычисленный своими действиями, затем переданный сверху
+            if let value = synthesized[identity]
+                .flatMap({ $0[reference.attribute] })
+            {
+                /// Источник для графа — собственный синтезированный атрибут
+                if let nodeIndex {
+                    let attributeNode = DependencyGraph.AttributeNode(
+                        owner: nodeIndex.graphName(of: node),
+                        attribute: reference.attribute,
+                        kind: .synthesized
+                    )
+                    
+                    recordEdge(from: attributeNode)
+                }
+                
+                return value
+            }
+            
+            if let value = inherited[identity]
+                .flatMap({ $0[reference.attribute] })
+            {
+                /// Источник для графа — собственный наследуемый атрибут, переданный родителем
+                if let nodeIndex {
+                    let attributeNode = DependencyGraph.AttributeNode(
+                        owner: nodeIndex.graphName(of: node),
+                        attribute: reference.attribute,
+                        kind: .inherited
+                    )
+                    
+                    recordEdge(from: attributeNode)
+                }
+                
+                return value
+            }
+            
+            /// Атрибут сейчас вычисляется или будет вычислен этим же правилом
+            let synKey = AttributeKey(node: identity, inherited: false, name: reference.attribute)
+            let inhKey = AttributeKey(node: identity, inherited: true, name: reference.attribute)
+            
+            let isOwnTarget = production(of: node).actions
+                .contains {
+                    if case .assignment(let target, _) = $0 {
+                        return target.target == 0 && target.attribute == reference.attribute
+                    }
+                    
+                    return false
+                }
+            
+            if computing.contains(synKey) || computing.contains(inhKey) || isOwnTarget {
+                throw EvaluateError.cyclicDependency(
+                    attribute: reference.attribute,
+                    nonterm: node.symbol
+                )
+            }
+            
+            throw EvaluateError.attributeNotComputed(
+                target: 0,
+                attribute: reference.attribute,
+                nonterm: node.symbol
+            )
+        }
+        
+        /// Правая часть — значение символа со всей цепочкой оберток сахара
+        let slot = try resolveSlot(reference.target, in: slots, nonterm: node.symbol)
+        
+        return try readSlot(
+            slot,
+            attribute: reference.attribute,
+            nonterm: node.symbol,
+            target: reference.target
+        )
+    }
+    
+    /// Рекурсивно читает значение слота, оборачивая его по видам сахара
+    ///
+    /// - одиночный символ — само значение атрибута
+    /// - повторение — массив значений по виткам
+    /// - опционал — значение или пустота
+    /// Вложенный сахар дает вложенные обертки
+    private func readSlot(
+        _ slot: Slot,
+        attribute: String,
+        nonterm: String,
+        target: UInt
+    ) throws -> AttributeValue {
+        switch slot {
+        case .single(let child):
+            return try value(of: child, attribute: attribute, nonterm: nonterm, target: target)
+            
+        case .repeated(let subs):
+            let values = try subs.map {
+                try readSlot($0, attribute: attribute, nonterm: nonterm, target: target)
+            }
+            
+            return .array(values)
+            
+        case .optional(let inner):
+            guard let inner else { return .optional(nil) }
+            
+            let nested = try readSlot(inner, attribute: attribute, nonterm: nonterm, target: target)
+            return .optional(nested)
+            
+        case .absent:
+            /// Выпавший обычный символ не имеет значения
+            return .undefined
+        }
+    }
+    
+    /// Значение атрибута одиночного символа: токен отдает текст, нетерминал — после спуска
+    private func value(
+        of child: ParseTree.Child,
+        attribute: String,
+        nonterm: String,
+        target: UInt
+    ) throws -> AttributeValue {
+        switch child {
+        case .token(let lexeme):
+            /// Источник для графа — встроенный атрибут текста этого токена
+            if let nodeIndex {
+                let attributeNode = DependencyGraph.AttributeNode(
+                    owner: nodeIndex.graphName(of: lexeme),
+                    attribute: "text",
+                    kind: .token
+                )
+                
+                recordEdge(from: attributeNode)
+            }
+            
+            /// У токена единственный атрибут — его текст
+            return .string(lexeme.text)
+            
+        case .tree(let subtree):
+            let identity = ObjectIdentifier(subtree)
+            /// Атрибут ребенка сейчас вычисляется выше по стеку — цикл через спуск
+            let key = AttributeKey(node: identity, inherited: false, name: attribute)
+            
+            if computing.contains(key) {
+                throw EvaluateError.cyclicDependency(attribute: attribute, nonterm: nonterm)
+            }
+            
+            /// Ленивый спуск: вычисляем ребенка перед чтением его синтезированного атрибута
+            try visit(subtree)
+            
+            guard let value = synthesized[identity].flatMap({ $0[attribute] }) else {
+                throw EvaluateError.attributeNotComputed(
+                    target: target,
+                    attribute: attribute,
+                    nonterm: nonterm
+                )
+            }
+            
+            /// Источник для графа — синтезированный атрибут ребенка
+            if let nodeIndex {
+                let attributeNode = DependencyGraph.AttributeNode(
+                    owner: nodeIndex.graphName(of: subtree),
+                    attribute: attribute,
+                    kind: .synthesized
+                )
+                
+                recordEdge(from: attributeNode)
+            }
+            
+            return value
+            
+        case .repetition:
+            /// Повторение разворачивается в slots заранее, сюда не попадает
+            return .undefined
+        }
+    }
+    
+    /// Снимает индексы subscripts при чтении, разыменовывая массив на каждом шаге
+    private func applySubscripts(
+        _ reference: Reference,
+        to base: AttributeValue,
+        node: ParseTree,
+        slots: [Slot]
+    ) throws -> AttributeValue {
+        var current = base
+        
+        for index in reference.subscripts {
+            let indexValue = try evaluate(index, node: node, slots: slots)
+            
+            guard case .int(let position) = indexValue else {
+                /// Индекс не целочислен — несоответствие было бы отловлено валидатором
+                throw EvaluateError.undefinedInExpression(nonterm: node.symbol)
+            }
+            
+            guard case .array(let elements) = current else {
+                throw EvaluateError.subscriptOutOfBounds(
+                    target: reference.target,
+                    attribute: reference.attribute
+                )
+            }
+            
+            guard position >= 0 && position < elements.count else {
+                throw EvaluateError.subscriptOutOfBounds(
+                    target: reference.target,
+                    attribute: reference.attribute
+                )
+            }
+            
+            current = elements[position]
+        }
+        
+        return current
+    }
+    
+    /// Вызывает метод семантики, конвертируя аргументы и результат через движок
+    private func invoke(
+        method: String,
+        arguments: [Expression],
+        node: ParseTree,
+        slots: [Slot]
+    ) throws -> AttributeValue {
+        /// Аргументы вычисляются и переводятся в значения движка
+        let values = try arguments.map { try evaluate($0, node: node, slots: slots) }
+        let jsArguments = values.map { $0.toJS(in: runtime.context) }
+        
+        let result = try runtime.call(method, arguments: jsArguments)
+        
+        /// Результат восстанавливаем по объявленному возвращаемому типу метода
+        guard let declaration = specification.methods[method] else {
+            throw EvaluateError.methodNotFound(name: method)
+        }
+        
+        /// Метод без возвращаемого значения дает отсутствие значения
+        guard let returnType = declaration.returnType else { return .undefined }
+        
+        return AttributeValue.fromJS(result, expected: returnType)
+    }
+    
+    /// Применяет бинарную операцию к двум значениям атрибутов
+    private func apply(
+        _ operation: Operator,
+        _ left: AttributeValue,
+        _ right: AttributeValue,
+        nonterm: String
+    ) throws -> AttributeValue {
+        /// Отсутствие в арифметике — ошибка выполнения
+        if left.isUndefined || right.isUndefined {
+            throw EvaluateError.undefinedInExpression(nonterm: nonterm)
+        }
+        
+        /// Сложение строк
+        if case .string(let leftText) = left,
+           case .string(let rightText) = right,
+           operation == .add
+        {
+            return .string(leftText + rightText)
+        }
+        
+        /// Числовые операции: целые остаются целыми, вещественное заражает результат
+        let leftNumber = number(of: left)
+        let rightNumber = number(of: right)
+        
+        guard let leftNumber, let rightNumber else {
+            throw EvaluateError.undefinedInExpression(nonterm: nonterm)
+        }
+        
+        /// Проверяем деление на ноль
+        if operation == .div, rightNumber == 0 {
+            throw EvaluateError.divisionByZero(nonterm: nonterm)
+        }
+        
+        let result = compute(operation, leftNumber, rightNumber)
+        
+        /// Целочисленный результат сохраняем целым, если оба операнда были целыми
+        if case .int = left, case .int = right,
+           operation != .div || result.truncatingRemainder(dividingBy: 1) == 0
+        {
+            let converted = Int(result)
+            return .int(converted)
+        }
+        
+        return .float(result)
+    }
+    
+    /// Числовое значение операнда или `nil`, если он не число
+    private func number(of value: AttributeValue) -> Double? {
+        switch value {
+        case .int(let number): return Double(number)
+        case .float(let number): return number
+        default: return nil
+        }
+    }
+    
+    /// Вычисляет арифметику над числами
+    private func compute(_ operation: Operator, _ left: Double, _ right: Double) -> Double {
+        switch operation {
+        case .add: return left + right
+        case .sub: return left - right
+        case .mul: return left * right
+        case .div: return left / right
+        }
+    }
+    
+    /// Регистрирует ребро в графе ко всем целям верхнего уровня стека
+    private func recordEdge(from source: DependencyGraph.AttributeNode) {
+        guard let targets = targetStack.last, !targets.isEmpty else { return }
+        
+        graphNodes.insert(source)
+        
+        for target in targets {
+            let edge = DependencyGraph.Edge(from: source, to: target)
+            graphEdges.insert(edge)
+        }
+    }
+    
+    /// Объявлен ли атрибут нетерминала наследуемым, иначе — синтезированным
+    private func isInheritedAttribute(_ attribute: String, of nonterm: String) -> Bool {
+        specification.attributes[nonterm]?
+            .contains {
+                guard $0.property.name == attribute else { return false }
+                if case .inherited = $0.type { return true }
+                
+                return false
+            }
+            ?? false
+    }
+    
+    /// Возвращает слот символа по номеру или бросает ошибку выхода за границы
+    private func resolveSlot(
+        _ target: UInt,
+        in slots: [Slot],
+        nonterm: String
+    ) throws -> Slot {
+        let index = Int(target) - 1
+        
+        guard index >= 0 && index < slots.count else {
+            throw EvaluateError.referenceOutOfBounds(target: target, nonterm: nonterm)
+        }
+        
+        return slots[index]
+    }
+    
+    /// Продукция, по которой свернут узел
+    private func production(of node: ParseTree) -> NumberedProduction {
+        productions[node.production]
+    }
+}
+
+// MARK: - Private Extensions
+
+private extension Evaluator {
+    
+    // MARK: - Type Entities
+    
+    /// Источник значения символа правой части в плоской нумерации
+    /// Рекурсивен: вложенный сахар дает вложенные обертки повторения и опционала
+    indirect enum Slot {
+        
+        /// Одиночный символ — поддерево или токен
+        case single(ParseTree.Child)
+        
+        /// Символ внутри повторения — подслот на каждый виток
+        case repeated([Slot])
+        
+        /// Символ внутри опционала — подслот или его отсутствие
+        case optional(Slot?)
+        
+        /// Символ выпал при устранении ε и не является сахаром
+        case absent
+    }
+}
+
+private extension Evaluator {
+    
+    // MARK: - Type Entities
+    
+    /// Ключ вычисляемого атрибута для обнаружения циклов
+    struct AttributeKey: Hashable {
+        
+        /// Узел, которому принадлежит атрибут
+        let node: ObjectIdentifier
+        
+        /// Синтезированный или наследуемый
+        let inherited: Bool
+        
+        /// Имя атрибута
+        let name: String
+    }
+}
